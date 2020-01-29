@@ -29,7 +29,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	
 	// memcpy (out, in, nframes * sizeof (jack_default_audio_sample_t));
 	for (int i = 0; i < nframes; ++i) {
-		out[i] = in[i]*2;
+		out[i] = in[i];
 	}
 	return 0;
 }
