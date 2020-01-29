@@ -26,7 +26,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	
 	in = jack_port_get_buffer (input_port, nframes);
 	out = jack_port_get_buffer (output_port, nframes);
-	memcpy (out, in, nframes * sizeof (jack_default_audio_sample_t));
+	
+	// memcpy (out, in, nframes * sizeof (jack_default_audio_sample_t));
+	for (int i = 0; i < nframes; ++i) {
+		out[i] = in[i]*2;
+	}
 	return 0;
 }
 
