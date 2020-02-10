@@ -16,9 +16,26 @@ jack_port_t **output_ports;
 jack_client_t *client;
 
 const unsigned int NUM_PORTS = 2;
+const unsigned int N_FRAMES = 2048;
 int delay_samples = 2;
+int push_id;
+int pop_id = 0;
+int buff_size;
 
 jack_default_audio_sample_t *buff;
+
+// Function to push a value to the buffer
+void push_to_buff(jack_default_audio_sample_t input_value) {
+	buff[push_id] = input_value;
+	push_id = (push_id + 1) % buff_size;
+}
+
+// Function to pop a value from the buffer
+jack_default_audio_sample_t pop_from_buff() {
+	jack_default_audio_sample_t res = buff[pop_id];
+	pop_id = (pop_id + 1) % buff_size;
+	return res;
+}
 
 /**
  * The process callback for this JACK application is called in a
@@ -40,24 +57,16 @@ int jack_callback (jack_nframes_t nframes, void *arg) {
         out[j] = jack_port_get_buffer (output_ports[j], nframes);
     }
 
-    // first step: buff to first samples in out
-    for (i =  0; i < delay_samples; ++i) {
-        out[0][i] = buff[i];
+    // first step: Push all of input to buff
+    for (i =  0; i < nframes; ++i) {
+        push_to_buff(in[0][i]);
     }
     
-    // 2nd step: first samples of in to last samples of out
-    int i_size = nframes - delay_samples;
-    for (i =  0, j = delay_samples; i < i_size; ++i, ++j) {
-        out[0][j] = in[0][i];
+    // 2nd step: POP nframes from the buffer
+    for (i =  0; i < nframes; ++i) {
+        out[0][i] = pop_from_buff();
     }
 
-    // 3rd step: last samples of in to buff
-    for (i = i_size, j = 0; i < nframes; ++i, ++j) {
-        buff[j] = in[0][i];
-    }
-	
-    // memcpy (out_1, in_1, nframes * sizeof (jack_default_audio_sample_t));
-	
     return 0;
 }
 
@@ -141,7 +150,9 @@ int main (int argc, char *argv[]) {
 
     // allocate buffer before ACTIVATE!
     // calloc initialize them with zero
-    buff = calloc(delay_samples, sizeof(jack_default_audio_sample_t));
+	push_id = delay_samples;
+	buff_size = delay_samples + N_FRAMES;
+    buff = calloc(delay_samples + N_FRAMES, sizeof(jack_default_audio_sample_t));
     // printf("Value of buff[0] %f\n", buff[0]);
 	/* Tell the JACK server that we are ready to roll.
 	   Our jack_callback() callback will start running now. */
