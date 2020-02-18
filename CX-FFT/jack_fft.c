@@ -23,6 +23,9 @@ jack_client_t *client;
 
 double sample_rate;
 
+double *freqs;
+double freq_cut = 2500.0;
+
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
@@ -44,10 +47,24 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	}
 	fftw_execute(i_forward);
 	
+	// printf("i_fft[0] = %f \n", cabs(i_fft[0])); fflush(stdout);
+
+	o_fft[0] = i_fft[0];
 	// Aquí podriamos hacer algo con i_fft
-	for(i = 0; i < nframes; i++){
-		o_fft[i] = i_fft[i];
+	for(i = 1; i < nframes/2; i++){
+		if (freqs[i] >= freq_cut) {
+			o_fft[i] = i_fft[i];
+			o_fft[nframes - i] = i_fft[nframes-i];
+		} else {
+			o_fft[i] = 0.0;
+		}
 	}
+	if (freqs[i] >= freq_cut) {
+		o_fft[i] = i_fft[i];	
+	} else {
+		o_fft[i] = 0;
+	}
+	
 	
 	// Regresando al dominio del tiempo
 	fftw_execute(o_inverse);
@@ -72,6 +89,14 @@ int main (int argc, char *argv[]) {
 	const char *client_name = "jack_fft";
 	jack_options_t options = JackNoStartServer;
 	jack_status_t status;
+	int i;
+
+	if (argc < 2) {
+		printf("Need cutoff frequency in hertz.\n");
+		exit(1);
+	}
+
+	freq_cut = atof(argv[1]);
 	
 	/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status);
@@ -113,6 +138,15 @@ int main (int argc, char *argv[]) {
 	
 	i_forward = fftw_plan_dft_1d(nframes, i_time, i_fft , FFTW_FORWARD, FFTW_MEASURE);
 	o_inverse = fftw_plan_dft_1d(nframes, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
+	
+	// vector for frequency indexes
+	freqs = (double*)malloc(sizeof(double) * nframes);
+	freqs[0] = 0.0;
+	for (i = 1; i < nframes/2; ++i) {
+		freqs[i] = ((double)i)*(sample_rate/(double)(nframes));
+		freqs[nframes-i] = -freqs[i];
+	}
+	freqs[i] = ((double)i)*(sample_rate/(double)(nframes));
 	
 	/* create the agent input port */
 	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
