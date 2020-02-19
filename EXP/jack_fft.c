@@ -33,7 +33,7 @@ int EXT_BUFF_SIZE;
 int idz = 0;
 int *vids;
 
-void hanning(double *vin) {
+void hanning(double complex *vin) {
 	for (int i = 0; i < EXT_BUFF_SIZE; ++i) {
 		vin[i] *= hann_vals[i];
 	}
@@ -74,6 +74,9 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		is_time[vids[5]][i] = in[i];
 	}
 
+	// HACEMOS HANN EN TEMP_OUTS V<2>
+	hanning(is_time[vids[2]]);
+
 	// TRANSORMAMOS V<2>
 	fftw_execute(is_forward[vids[2]]);
 	
@@ -91,9 +94,6 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	for(i = 0; i < EXT_BUFF_SIZE; i++){
 		temp_outs[vids[2]][i] = creal(os_time[vids[2]][i])/(double)EXT_BUFF_SIZE;
 	}
-
-	// HACEMOS HANN EN TEMP_OUTS V<2>
-	hanning(temp_outs[vids[2]]);
 
 	// HACEMOS SUMA DE LOS INDICES INTERESANTES Y LOS GUARDAMOS EN OUT
 	for(i = 0; i < nframes; i++){
@@ -198,13 +198,13 @@ int main (int argc, char *argv[]) {
 	}
 	
 	// vector for frequency indexes
-	freqs = (double*)malloc(sizeof(double) * nframes);
+	freqs = (double*)malloc(sizeof(double) * EXT_BUFF_SIZE);
 	freqs[0] = 0.0;
-	for (i = 1; i < nframes/2; ++i) {
-		freqs[i] = ((double)i)*(sample_rate/(double)(nframes));
-		freqs[nframes-i] = -freqs[i];
+	for (i = 1; i < EXT_BUFF_SIZE/2; ++i) {
+		freqs[i] = ((double)i)*(sample_rate/(double)(EXT_BUFF_SIZE));
+		freqs[EXT_BUFF_SIZE-i] = -freqs[i];
 	}
-	freqs[i] = ((double)i)*(sample_rate/(double)(nframes));
+	freqs[i] = ((double)i)*(sample_rate/(double)(EXT_BUFF_SIZE));
 	
 	/* create the agent input port */
 	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
