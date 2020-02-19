@@ -17,19 +17,20 @@
 double complex  **is_time, **is_fft, **os_time, **os_fft;
 fftw_plan *is_forward, *os_inverse;
 
-jack_port_t *input_port;
-jack_port_t *output_port;
+jack_port_t **input_ports;
+jack_port_t **output_ports;
 jack_client_t *client;
 
 double sample_rate;
 
 double *freqs, **temp_outs, *hann_vals;
-double freq_cut = 2500.0;
 
 const int NUM_BUFFS = 6;
 const int NUM_WINDOWS = 4;
+const int NUM_PORTS = 2;
 const double MY_PI = 3.14159265358979323846;
 int EXT_BUFF_SIZE;
+double DELAY_TIME;
 int idz = 0;
 int *vids;
 
@@ -48,30 +49,34 @@ void hanning(double complex *vin) {
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
-	jack_default_audio_sample_t *in, *out;
-	int i;
+	jack_default_audio_sample_t **in, **out;
+	int i, j;
 	idz %= NUM_BUFFS;
 
 	for (i = 0; i < NUM_BUFFS; ++i) {
 		vids[i] = (idz + i) % NUM_BUFFS;
 	}
 
-	in = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port, nframes);
-	out = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port, nframes);
+	in = malloc(NUM_PORTS * sizeof(jack_default_audio_sample_t*));
+    out = malloc(NUM_PORTS * sizeof(jack_default_audio_sample_t*));
+    for (j = 0; j < NUM_PORTS; ++j) {
+        in[j] = jack_port_get_buffer (input_ports[j], nframes);
+        out[j] = jack_port_get_buffer (output_ports[j], nframes);
+    }
 	
 	// Obteniendo la transformada de Fourier de este periodo
 	for(i = 0; i < nframes; i++){
 		// GUARDAMOS en 4tas posiciones de V<2>
-		is_time[vids[2]][3072 + i] = in[i];
+		is_time[vids[2]][3072 + i] = in[0][i];
 
 		// GUARDAMOS en 3ras posiciones de V<3>
-		is_time[vids[3]][2048 + i] = in[i];
+		is_time[vids[3]][2048 + i] = in[0][i];
 
 		// GUARDAMOS en 2das posiciones de V<4>
-		is_time[vids[4]][1024 + i] = in[i];
+		is_time[vids[4]][1024 + i] = in[0][i];
 
 		// GUARDAMOS en primeras posiciones de V<5>
-		is_time[vids[5]][i] = in[i];
+		is_time[vids[5]][i] = in[0][i];
 	}
 
 	// HACEMOS HANN EN TEMP_OUTS V<2>
@@ -86,7 +91,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	}
 
 	// HACEMOS DESFASE en OUT FFT V<2> ???
-	
+	for(i = 0; i < EXT_BUFF_SIZE; i++){
+		os_fft[vids[2]][i] *= cexp(-I*2.0*MY_PI*freqs[i]*DELAY_TIME);
+	}
+
 	// REGRESAMOS A TIEMPO
 	fftw_execute(os_inverse[vids[2]]);
 
@@ -97,7 +105,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	// HACEMOS SUMA DE LOS INDICES INTERESANTES Y LOS GUARDAMOS EN OUT
 	for(i = 0; i < nframes; i++){
-		out[i] = temp_outs[vids[0]][i + 2559] + temp_outs[vids[2]][i + 511]; //fftw3 requiere normalizar su salida real de esta manera
+		out[0][i] = temp_outs[vids[0]][i + 2559] + temp_outs[vids[2]][i + 511]; //fftw3 requiere normalizar su salida real de esta manera
+		out[1][i] = creal(is_time[vids[0]][i + 2559]) + creal(is_time[vids[2]][i + 511]); //fftw3 requiere normalizar su salida real de esta manera
 	}
 	
 	idz++;
@@ -125,7 +134,7 @@ int main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-	freq_cut = atof(argv[1]);
+	DELAY_TIME = atof(argv[1]);
 	
 	/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status);
@@ -206,17 +215,22 @@ int main (int argc, char *argv[]) {
 	}
 	freqs[i] = ((double)i)*(sample_rate/(double)(EXT_BUFF_SIZE));
 	
-	/* create the agent input port */
-	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
+	/* allocate memory for ports */
+    input_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
+    output_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
+    char port_name[10];
+
+	/* create the agents for input port */
+	for (int i = 0; i < NUM_PORTS; ++i) {
+        sprintf(port_name, "input_%d", i);
+        input_ports[i] = jack_port_register (client, port_name, JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
+    }
 	
-	/* create the agent output port */
-	output_port = jack_port_register (client, "output",JACK_DEFAULT_AUDIO_TYPE,JackPortIsOutput, 0);
-	
-	/* check that both ports were created succesfully */
-	if ((input_port == NULL) || (output_port == NULL)) {
-		printf("Could not create agent ports. Have we reached the maximum amount of JACK agent ports?\n");
-		exit (1);
-	}
+	/* create the agents output port */
+    for (int i = 0; i < NUM_PORTS; ++i) {
+        sprintf(port_name, "output_%d", i);
+        output_ports[i] = jack_port_register (client, port_name,JACK_DEFAULT_AUDIO_TYPE,JackPortIsOutput, 0);
+    }
 	
 	/* Tell the JACK server that we are ready to roll.
 	   Our jack_callback() callback will start running now. */
@@ -244,11 +258,18 @@ int main (int argc, char *argv[]) {
 		printf("No available physical capture (server output) ports.\n");
 		exit (1);
 	}
-	// Connect the first available to our input port
-	if (jack_connect (client, serverports_names[0], jack_port_name (input_port))) {
-		printf("Cannot connect input port.\n");
-		exit (1);
-	}
+	
+	
+    for (int i = 0; i < NUM_PORTS; ++i) {
+
+        // Connect the available ports to our input ports
+        if (jack_connect (client, serverports_names[i], jack_port_name (input_ports[i]))) {
+            printf("Cannot connect input port %d.\n", i);
+            exit (1);
+        }
+
+    }
+
 	// free serverports_names variable for reuse in next part of the code
 	free (serverports_names);
 	
@@ -260,11 +281,17 @@ int main (int argc, char *argv[]) {
 		printf("No available physical playback (server input) ports.\n");
 		exit (1);
 	}
-	// Connect the first available to our output port
-	if (jack_connect (client, jack_port_name (output_port), serverports_names[0])) {
-		printf ("Cannot connect output ports.\n");
-		exit (1);
-	}
+	
+	for (int i = 0; i < NUM_PORTS; ++i) {
+
+        // Connect available to our output ports 
+        if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
+            printf ("Cannot connect output port 1.\n");
+            exit (1);
+        }
+
+    }
+
 	// free serverports_names variable, we're not going to use it again
 	free (serverports_names);
 	
