@@ -24,6 +24,7 @@ jack_client_t *client;
 double sample_rate;
 
 double *freqs, **temp_outs, *hann_vals;
+double complex  *exponentials;
 
 const int NUM_BUFFS = 6;
 const int NUM_WINDOWS = 4;
@@ -90,9 +91,9 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		os_fft[vids[2]][i] = is_fft[vids[2]][i];
 	}
 
-	// HACEMOS DESFASE en OUT FFT V<2> ???
+	// HACEMOS DESFASE en OUT FFT V<2>
 	for(i = 0; i < EXT_BUFF_SIZE; i++){
-		os_fft[vids[2]][i] *= cexp(-I*2.0*MY_PI*freqs[i]*DELAY_TIME);
+		os_fft[vids[2]][i] *= exponentials[i];
 	}
 
 	// REGRESAMOS A TIEMPO
@@ -214,7 +215,13 @@ int main (int argc, char *argv[]) {
 		freqs[EXT_BUFF_SIZE-i] = -freqs[i];
 	}
 	freqs[i] = ((double)i)*(sample_rate/(double)(EXT_BUFF_SIZE));
-	
+
+	// Vector for exponentials
+	exponentials = (complex double *)malloc(sizeof(complex double) * EXT_BUFF_SIZE);
+	for(i = 0; i < EXT_BUFF_SIZE; i++){
+		exponentials[i] = cexp(-I*2.0*MY_PI*freqs[i]*DELAY_TIME);
+	}
+
 	/* allocate memory for ports */
     input_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
     output_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
