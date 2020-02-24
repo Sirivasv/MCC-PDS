@@ -131,7 +131,7 @@ int main (int argc, char *argv[]) {
 	int i;
 
 	if (argc < 2) {
-		printf("Need cutoff frequency in hertz.\n");
+		printf("Need the delay time in seconds (0 to 0.011).\n");
 		exit(1);
 	}
 
