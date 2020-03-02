@@ -26,8 +26,9 @@ double sample_rate;
 double *buffer, *fft1, *fft2, *hann;
 
 unsigned int buffer_size;
-unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, out2_offset;
 unsigned int fft_size;
+
+unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, out2_offset;
 
 double *freqs;
 double complex *delay_vector;
