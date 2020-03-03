@@ -99,13 +99,13 @@ int main (int argc, char *argv[]) {
 
 	/* create the agents for input port */
 	for (int i = 0; i < NUM_PORTS; ++i) {
-        sprintf(port_name, "input_%d", i);
+        sprintf(port_name, "input_%d", (i+1));
         input_ports[i] = jack_port_register (client, port_name, JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
     }
 	
 	/* create the agents output port */
     for (int i = 0; i < NUM_PORTS; ++i) {
-        sprintf(port_name, "output_%d", i);
+        sprintf(port_name, "output_%d", (i+1));
         output_ports[i] = jack_port_register (client, port_name,JACK_DEFAULT_AUDIO_TYPE,JackPortIsOutput, 0);
     }
 	
