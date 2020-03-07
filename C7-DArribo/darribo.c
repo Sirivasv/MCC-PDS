@@ -23,44 +23,127 @@ jack_default_audio_sample_t **in, **out;
 jack_client_t *client;
 
 double sample_rate;
-jack_default_audio_sample_t **buffer;
-double *sub_buffer_1, *sub_buffer_2, *hann;
+double *hann;
+const double MY_PI = 3.14159265358979323846264338327950288;
 
-unsigned int buffer_size;
-unsigned int sub_buffer_size;
-unsigned int ports_number;
+// CCV Requirements
+double complex **signal_FFT, **signal_IFFT, **signal_CONJ, *signal_CCVFFT;
+double *signal_NORM, **signal_CENTER, *resultCCV, *signal_CCVIFFT;
 
-unsigned int in_i, sub_buffer_1_i, sub_buffer_2_i, sub_buffer_1_offset, sub_buffer_2_offset, out_nodelay_offset;
-unsigned int **indexes_per_port;
-
+unsigned int ports_number, sub_buffer_size;
 double *freqs;
-double complex *delay_vector;
-double delay_seconds;
 
-void filter(double *data) {
-	int i;
+void centerSignal(jack_default_audio_sample_t *data, double *return_data) {
+    int i;
 
-	// Hann
+    // First we get the mean of the data
+    // double mean_of_signal = 0;
+
+    // for (i = 0; i < sub_buffer_size; ++i) {
+    //     mean_of_signal += (double)data[i];
+    // }
+
+    // mean_of_signal /= (double)sub_buffer_size;
+
+    // for (i = 0; i < sub_buffer_size; ++i) {
+    //     return_data[i] -= mean_of_signal;
+    // }
+
+    for (i = 0; i < sub_buffer_size; ++i) {
+        return_data[i] -= (double)data[i];
+    }
+
+}
+
+void FFTSignal(double *data, double complex *return_data) {
+    int i;
+
 	for (i = 0; i < sub_buffer_size; ++i) {
-		i_time[i] = data[i] * hann[i];
+		i_time[i] = data[i];
 	}
 
 	// FFT
 	fftw_execute(i_forward);
 
-	// Filter
+	// return
 	for (i = 0; i < sub_buffer_size; ++i) {
-		o_fft[i] = i_fft[i] * delay_vector[i];
+		return_data[i] = i_fft[i];
 	}
 
-	// ifft
+}
+
+void IFFTSignal(double complex *data, double *return_data) {
+    int i;
+
+	for (i = 0; i < sub_buffer_size; ++i) {
+		o_fft[i] = data[i];
+	}
+
+	// IFFT
 	fftw_execute(o_inverse);
 
 	// return
-	for(i = 0; i < sub_buffer_size; i++){
-		data[i] = creal(o_time[i])/(double)sub_buffer_size; //fftw3 requiere normalizar su salida real de esta manera
+	for (i = 0; i < sub_buffer_size; ++i) {
+		return_data[i] = creal(o_time[i])/(double)sub_buffer_size;
 	}
+
 }
+
+void conjugateCompSignal(double complex *data, double complex *return_data) {
+    int i;
+
+	for (i = 0; i < sub_buffer_size; ++i) {
+		return_data[i] = conj(data[i]);
+	}
+
+}
+
+void pointProduct(double complex *xf, double complex *y_conj_f, double complex *return_data) {
+
+    int i;
+
+    for (i = 0; i < sub_buffer_size; ++i) {
+		return_data[i] = xf[i] * y_conj_f[i];
+	}
+
+}
+
+double getNormSignalInR(double *data) {
+
+    int i;
+	double return_data;
+
+    for (i = 0; i < sub_buffer_size; ++i) {
+		return_data += data[i] * data[i];
+	}
+
+	return sqrt(return_data);
+}
+
+// void filter(double *data) {
+// 	int i;
+
+// 	// Hann
+// 	for (i = 0; i < sub_buffer_size; ++i) {
+// 		i_time[i] = data[i] * hann[i];
+// 	}
+
+// 	// FFT
+// 	fftw_execute(i_forward);
+
+// 	// Filter
+// 	for (i = 0; i < sub_buffer_size; ++i) {
+// 		o_fft[i] = i_fft[i] * delay_vector[i];
+// 	}
+
+// 	// ifft
+// 	fftw_execute(o_inverse);
+
+// 	// return
+// 	for(i = 0; i < sub_buffer_size; i++){
+// 		data[i] = creal(o_time[i])/(double)sub_buffer_size; //fftw3 requiere normalizar su salida real de esta manera
+// 	}
+// }
 
 /**
  * The process callback for this JACK application is called in a
@@ -71,57 +154,65 @@ void filter(double *data) {
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
-	int i;
-    for (i = 0; i < ports_number; ++i) {
-        in[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[i], nframes);
-	    out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[i], nframes);
-    }
-
-    unsigned int step_in_i = in_i;
-    unsigned int step_sub_buffer_1_i = sub_buffer_1_i;
-    unsigned int step_sub_buffer_2_i = sub_buffer_2_i;
-
-    for (int port_i = 0; port_i < ports_number; ++port_i) {
-
-        step_in_i = in_i;
-        step_sub_buffer_1_i = sub_buffer_1_i;
-        step_sub_buffer_2_i = sub_buffer_2_i;
-
-        // copy in to las nframes of buffer
-        for (i = 0; i < nframes; ++i, ++step_in_i) {
-            if (step_in_i >= buffer_size) step_in_i = 0;
-            buffer[port_i][step_in_i] = in[port_i][i];
-        }
-
-        // Fill sub_buffer_1 y sub_buffer_2
-        unsigned int sub_buffer_1_i_local = step_sub_buffer_1_i; 
-        unsigned int sub_buffer_2_i_local = step_sub_buffer_2_i; 
-        for (i = 0; i < sub_buffer_size; ++i, ++sub_buffer_1_i_local, ++sub_buffer_2_i_local) {
-            if (sub_buffer_1_i_local >= buffer_size) sub_buffer_1_i_local = 0;
-            sub_buffer_1[i] = buffer[port_i][sub_buffer_1_i_local];
-
-            if (sub_buffer_2_i_local >= buffer_size) sub_buffer_2_i_local = 0;
-            sub_buffer_2[i] = buffer[port_i][sub_buffer_2_i_local];
-        }
-
-        step_sub_buffer_1_i += nframes;
-        if (step_sub_buffer_1_i >= buffer_size) step_sub_buffer_1_i = 0;
-        
-        step_sub_buffer_2_i += nframes;
-        if (step_sub_buffer_2_i >= buffer_size) step_sub_buffer_2_i = 0;
-
-        filter(sub_buffer_1);
-        filter(sub_buffer_2);
-        
+	int i, port_i;
+    for (port_i = 0; port_i < ports_number; ++port_i) {
+        in[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[port_i], nframes);
+	    out[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[port_i], nframes);
         for (i = 0; i < nframes; ++i) {
-            out[port_i][i] = sub_buffer_1[sub_buffer_1_offset + i] + sub_buffer_2[sub_buffer_2_offset + i];
+            out[port_i][i] = in[port_i][i];
         }
-
-    
     }
-    in_i = step_in_i;
-    sub_buffer_1_i = step_sub_buffer_1_i;
-    sub_buffer_2_i = step_sub_buffer_2_i;
+    
+    
+    for (port_i = 0; port_i < ports_number; ++port_i) {
+        
+        // We center the signals 
+        centerSignal(in[port_i], signal_CENTER[port_i]); 
+    
+        // We get the centererd signals fourier transform
+        FFTSignal(signal_CENTER[port_i], signal_FFT[port_i]);
+
+        // We get the norm of the signals
+        signal_NORM[port_i] = getNormSignalInR(signal_CENTER[port_i]);
+
+    }
+
+    // We get the conjugate from the second signal
+    conjugateCompSignal(signal_FFT[1], signal_CONJ[1]);
+
+    // We get the point product of fft from first signal and the conjugate of the second
+    pointProduct(signal_FFT[0], signal_CONJ[1], signal_CCVFFT);
+
+	// We get the inverse transform of CCVF
+	IFFTSignal(signal_CCVFFT, signal_CCVIFFT);
+
+	// We point divide the Inverse by the norm product
+	double norm_product = signal_NORM[0] * signal_NORM[1];
+	double max_val = signal_CCVIFFT[0] / norm_product;
+	int max_i = 0;
+	for (i = 0; i < sub_buffer_size; ++i) {
+		resultCCV[i] = signal_CCVIFFT[i] / norm_product;
+		if (resultCCV[i] > max_val) {
+			max_i = i;
+			max_val = resultCCV[i];
+		}
+	}
+	
+	printf("******************************************\n");
+	printf("max_val = %lf /// max_i = %d\n", max_val, max_i);
+	int delay;
+	if ( max_i < (sub_buffer_size / 2)) {
+		delay = max_i - 1;
+	} else {
+		delay = sub_buffer_size - max_i - 1;
+	}
+
+	printf("DESFASE = %d\n", delay);
+	double delay_in_seconds = ((double)delay) / 44100.0;
+	printf("DESFASE en segundos = %lf\n", delay_in_seconds);
+	double angle_of_direction = (asin((343.0 * delay_in_seconds) / 0.18) * 180.0) / MY_PI;
+	printf("DIRECCION DE ARRIBO en grados = %lf\n", angle_of_direction);
+	fflush(stdout);
 	return 0;
 }
 
@@ -136,17 +227,10 @@ void jack_shutdown (void *arg){
 
 
 int main (int argc, char *argv[]) {
-	const char *client_name = "jack_fft";
+	const char *client_name = "darribo";
 	jack_options_t options = JackNoStartServer;
 	jack_status_t status;
 	int i;
-
-	if (argc < 2) {
-		printf("Need delay in seconds.\n");
-		exit(1);
-	}
-
-	delay_seconds = atof(argv[1]);
 	
 	/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status);
@@ -181,19 +265,8 @@ int main (int argc, char *argv[]) {
 	int nframes = jack_get_buffer_size (client);
 	
 	// Preparing overlap and add sizes
-	buffer_size = 6 * nframes;
-	sub_buffer_size = 4 * nframes;
+	sub_buffer_size = nframes;
     ports_number = 2;
-
-    // Indexes
-    in_i = 5 * nframes;
-    sub_buffer_1_i = 0;
-    sub_buffer_2_i = 2 * nframes;
-    sub_buffer_1_offset = (int)(2.5 * (double)nframes);
-    sub_buffer_2_offset = (int)(0.5 * (double)nframes);
-    out_nodelay_offset = (int)(3.5 * (double)nframes);
-
-	// printf("%d %d %d\n", sub_buffer_1_offset, sub_buffer_2_offset, out_nodelay_offset);
 
 
 	//preparing FFTW3 buffers
@@ -204,22 +277,34 @@ int main (int argc, char *argv[]) {
 	
 	i_forward = fftw_plan_dft_1d(sub_buffer_size, i_time, i_fft , FFTW_FORWARD, FFTW_MEASURE);
 	o_inverse = fftw_plan_dft_1d(sub_buffer_size, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
-	
-    buffer = (jack_default_audio_sample_t**) malloc(ports_number * sizeof(jack_default_audio_sample_t*));
-	for (i = 0; i < ports_number; ++i) {
-	    buffer[i] = (jack_default_audio_sample_t *) malloc(buffer_size * sizeof(jack_default_audio_sample_t));
+
+    // CCV
+	signal_CONJ = (double complex **) fftw_malloc(sizeof(double complex*) * ports_number);
+	signal_FFT = (double complex **) fftw_malloc(sizeof(double complex*) * ports_number);
+	signal_IFFT = (double complex **) fftw_malloc(sizeof(double complex*) * ports_number);
+    signal_CENTER = (double **) fftw_malloc(sizeof(double*) * ports_number);
+    signal_NORM = (double *) fftw_malloc(sizeof(double*) * ports_number);
+    
+    for (i = 0; i < ports_number; ++i) {
+
+        // CCV
+        signal_CONJ[i] = (double complex *) fftw_malloc(sizeof(double complex) * sub_buffer_size);
+        signal_FFT[i] = (double complex *) fftw_malloc(sizeof(double complex) * sub_buffer_size);
+        signal_IFFT[i] = (double complex *) fftw_malloc(sizeof(double complex) * sub_buffer_size);
+        signal_CENTER[i] = (double *) fftw_malloc(sizeof(double) * sub_buffer_size);
+        signal_CCVFFT = (double complex *) fftw_malloc(sizeof(double complex) * sub_buffer_size);
+        signal_CCVIFFT = (double *) fftw_malloc(sizeof(double) * sub_buffer_size);
+        resultCCV = (double *) fftw_malloc(sizeof(double) * sub_buffer_size);
+
     }
 
-	sub_buffer_1 = (double *) calloc(sub_buffer_size, sizeof(double));
-	sub_buffer_2 = (double *) calloc(sub_buffer_size, sizeof(double));
 	hann = (double *) calloc(sub_buffer_size, sizeof(double));
-	delay_vector = (double complex *) malloc(sub_buffer_size * sizeof(double complex));
 	freqs = (double *) calloc(sub_buffer_size, sizeof(double));
 
 
 	// Calculate hann window
 	for (i = 0; i < sub_buffer_size;++i)
-		hann[i] = 0.5 * (1 - cos( (2.0*M_PI*i)/(sub_buffer_size - 1) ));
+		hann[i] = 0.5 * (1 - cos( (2.0*MY_PI*i)/(sub_buffer_size - 1) ));
 
 	// vector for frequency indexes
 	freqs[0] = 0.0;
@@ -228,11 +313,6 @@ int main (int argc, char *argv[]) {
 	for (i = 1; i < lim; ++i) {
 		freqs[i] = ((double)i)*(sample_rate/(double)(sub_buffer_size));
 		freqs[sub_buffer_size-i] = -freqs[i];
-	}
-
-	// Exponencials for delay
-	for (i = 0; i < sub_buffer_size; ++i) {
-		delay_vector[i] = cexp(-I*2.0*M_PI*freqs[i]*delay_seconds);
 	}
 
 	// Create agent ports
