@@ -37,21 +37,22 @@ void centerSignal(jack_default_audio_sample_t *data, double *return_data) {
     int i;
 
     // First we get the mean of the data
-    // double mean_of_signal = 0;
-
-    // for (i = 0; i < sub_buffer_size; ++i) {
-    //     mean_of_signal += (double)data[i];
-    // }
-
-    // mean_of_signal /= (double)sub_buffer_size;
-
-    // for (i = 0; i < sub_buffer_size; ++i) {
-    //     return_data[i] -= mean_of_signal;
-    // }
+    double mean_of_signal = 0;
 
     for (i = 0; i < sub_buffer_size; ++i) {
-        return_data[i] -= (double)data[i];
+        mean_of_signal += (double)data[i];
     }
+
+    mean_of_signal /= (double)sub_buffer_size;
+
+    for (i = 0; i < sub_buffer_size; ++i) {
+        return_data[i] = data[i] - mean_of_signal;
+    }
+
+	// Why there is no much difference?
+    // for (i = 0; i < sub_buffer_size; ++i) {
+    //     return_data[i] = (double)data[i];
+    // }
 
 }
 
