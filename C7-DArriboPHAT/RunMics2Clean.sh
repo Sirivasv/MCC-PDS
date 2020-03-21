@@ -1,0 +1,1 @@
+sleep 2 && ./ReadMicWavs darribo input_ /home/sirivasv/Downloads/corpus44100/clean-1source/ 2
