@@ -1,0 +1,277 @@
+13:30:40.168 Logging started --- mié. sep 23 13:30:40 2020 ---
+13:30:40.188 Statistics reset.
+13:30:40.191 ALSA connection change.
+13:30:40.193 D-BUS: Service is available (org.jackaudio.service aka jackdbus).
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+13:30:40.249 ALSA connection graph change.
+13:45:21.566 D-BUS: JACK server is starting...
+13:45:21.641 D-BUS: JACK server was started (org.jackaudio.service aka jackdbus).
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+Wed Sep 23 13:45:21 2020: Starting jack server...
+Wed Sep 23 13:45:21 2020: JACK server starting in realtime mode with priority 10
+Wed Sep 23 13:45:21 2020: self-connect-mode is "Don't restrict self connect requests"
+Wed Sep 23 13:45:21 2020: Acquired audio card Audio0
+Wed Sep 23 13:45:21 2020: creating alsa driver ... hw:PCH|hw:PCH|1024|2|48000|0|0|nomon|swmeter|-|32bit
+Wed Sep 23 13:45:21 2020: configuring for 48000Hz, period = 1024 frames (21.3 ms), buffer = 2 periods
+Wed Sep 23 13:45:21 2020: ALSA: final selected sample format for capture: 32bit integer little-endian
+Wed Sep 23 13:45:21 2020: ALSA: use 2 periods for capture
+Wed Sep 23 13:45:21 2020: ALSA: final selected sample format for playback: 32bit integer little-endian
+Wed Sep 23 13:45:21 2020: ALSA: use 2 periods for playback
+Wed Sep 23 13:45:21 2020: graph reorder: new port 'system:capture_1'
+Wed Sep 23 13:45:21 2020: New client 'system' with PID 0
+Wed Sep 23 13:45:21 2020: graph reorder: new port 'system:capture_2'
+Wed Sep 23 13:45:21 2020: graph reorder: new port 'system:playback_1'
+Wed Sep 23 13:45:21 2020: graph reorder: new port 'system:playback_2'
+Wed Sep 23 13:45:21 2020: New client 'PulseAudio JACK Sink' with PID 1545
+Wed Sep 23 13:45:21 2020: Connecting 'PulseAudio JACK Sink:front-left' to 'system:playback_1'
+Wed Sep 23 13:45:21 2020: Connecting 'PulseAudio JACK Sink:front-right' to 'system:playback_2'
+Wed Sep 23 13:45:21 2020: New client 'PulseAudio JACK Source' with PID 1545
+Wed Sep 23 13:45:21 2020: Connecting 'system:capture_1' to 'PulseAudio JACK Source:front-left'
+Wed Sep 23 13:45:21 2020: Connecting 'system:capture_2' to 'PulseAudio JACK Source:front-right'
+Wed Sep 23 13:45:23 2020: Saving settings to "/home/sirivasv/.config/jack/conf.xml" ...
+13:45:23.683 JACK connection change.
+13:45:23.684 Server configuration saved to "/home/sirivasv/.jackdrc".
+13:45:23.685 Statistics reset.
+13:45:23.700 Client activated.
+13:45:23.700 Patchbay deactivated.
+13:45:23.700 Post-startup script...
+13:45:23.701 /home/sirivasv/jack_startup
+13:45:23.748 JACK connection graph change.
+13:45:24.245 Post-startup script terminated successfully.
+13:45:24.246 JACK connection change.
+Wed Sep 23 13:45:23 2020: New client 'qjackctl' with PID 5956
+Wed Sep 23 13:45:23 2020: New client 'PulseAudio JACK Sink-01' with PID 1545
+Wed Sep 23 13:45:23 2020: Connecting 'PulseAudio JACK Sink-01:front-left' to 'system:playback_1'
+Wed Sep 23 13:45:23 2020: Connecting 'PulseAudio JACK Sink-01:front-right' to 'system:playback_2'
+Wed Sep 23 13:45:23 2020: New client 'PulseAudio JACK Source-01' with PID 1545
+Wed Sep 23 13:45:23 2020: Connecting 'system:capture_1' to 'PulseAudio JACK Source-01:front-left'
+Wed Sep 23 13:45:24 2020: Connecting 'system:capture_2' to 'PulseAudio JACK Source-01:front-right'
+13:45:27.869 Client deactivated.
+13:45:27.871 Shutdown script...
+13:45:27.872 /home/sirivasv/jack_shutdown
+Wed Sep 23 13:45:27 2020: Client 'qjackctl' with PID 5956 is out
+Wed Sep 23 13:45:28 2020: Disconnecting 'PulseAudio JACK Sink-01:front-left' from 'system:playback_1'
+Wed Sep 23 13:45:28 2020: Disconnecting 'PulseAudio JACK Sink-01:front-right' from 'system:playback_2'
+Wed Sep 23 13:45:28 2020: Client 'PulseAudio JACK Sink-01' with PID 1545 is out
+Wed Sep 23 13:45:28 2020: Disconnecting 'system:capture_1' from 'PulseAudio JACK Source-01:front-left'
+Wed Sep 23 13:45:28 2020: Disconnecting 'system:capture_2' from 'PulseAudio JACK Source-01:front-right'
+Wed Sep 23 13:45:28 2020: Client 'PulseAudio JACK Source-01' with PID 1545 is out
+13:45:28.316 Shutdown script terminated successfully.
+13:45:28.385 D-BUS: JACK server is stopping...
+13:45:28.386 D-BUS: JACK server was stopped (org.jackaudio.service aka jackdbus).
+Wed Sep 23 13:45:28 2020: Stopping jack server...
+Wed Sep 23 13:45:28 2020: Client 'system' with PID 0 is out
+Wed Sep 23 13:45:28 2020: Client 'PulseAudio JACK Sink' with PID 1545 is out
+Wed Sep 23 13:45:28 2020: Client 'PulseAudio JACK Source' with PID 1545 is out
+Wed Sep 23 13:45:28 2020: ERROR: Cannot write socket fd = 16 err = Broken pipe
+Wed Sep 23 13:45:28 2020: ERROR: CheckRes error
+Wed Sep 23 13:45:28 2020: ERROR: Could not write notification
+Wed Sep 23 13:45:28 2020: ERROR: ClientNotify fails name = system notification = 1 val1 = 0 val2 = 0
+Wed Sep 23 13:45:28 2020: ERROR: Cannot write socket fd = 19 err = Broken pipe
+Wed Sep 23 13:45:28 2020: ERROR: CheckRes error
+Wed Sep 23 13:45:28 2020: ERROR: Could not write notification
+Wed Sep 23 13:45:28 2020: ERROR: ClientNotify fails name = system notification = 1 val1 = 0 val2 = 0
+Wed Sep 23 13:45:28 2020: Released audio card Audio0
+Wed Sep 23 13:45:28 2020: ERROR: Cannot write socket fd = 16 err = Broken pipe
+Wed Sep 23 13:45:28 2020: ERROR: CheckRes error
+Wed Sep 23 13:45:28 2020: ERROR: Could not write notification
+Wed Sep 23 13:45:28 2020: ERROR: ClientNotify fails name = freewheel notification = 1 val1 = 0 val2 = 0
+Wed Sep 23 13:45:28 2020: ERROR: Cannot write socket fd = 19 err = Broken pipe
+Wed Sep 23 13:45:28 2020: ERROR: CheckRes error
+Wed Sep 23 13:45:28 2020: ERROR: Could not write notification
+Wed Sep 23 13:45:28 2020: ERROR: ClientNotify fails name = freewheel notification = 1 val1 = 0 val2 = 0
+13:47:42.406 D-BUS: JACK server is starting...
+Wed Sep 23 13:47:42 2020: Starting jack server...
+Wed Sep 23 13:47:42 2020: JACK server starting in realtime mode with priority 10
+Wed Sep 23 13:47:42 2020: self-connect-mode is "Don't restrict self connect requests"
+13:47:42.453 D-BUS: JACK server was started (org.jackaudio.service aka jackdbus).
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+Wed Sep 23 13:47:42 2020: Acquired audio card Audio0
+Wed Sep 23 13:47:42 2020: creating alsa driver ... hw:PCH|hw:PCH|1024|2|48000|0|0|nomon|swmeter|-|32bit
+Wed Sep 23 13:47:42 2020: configuring for 48000Hz, period = 1024 frames (21.3 ms), buffer = 2 periods
+Wed Sep 23 13:47:42 2020: ALSA: final selected sample format for capture: 32bit integer little-endian
+Wed Sep 23 13:47:42 2020: ALSA: use 2 periods for capture
+Wed Sep 23 13:47:42 2020: ALSA: final selected sample format for playback: 32bit integer little-endian
+Wed Sep 23 13:47:42 2020: ALSA: use 2 periods for playback
+Wed Sep 23 13:47:42 2020: graph reorder: new port 'system:capture_1'
+Wed Sep 23 13:47:42 2020: New client 'system' with PID 0
+Wed Sep 23 13:47:42 2020: graph reorder: new port 'system:capture_2'
+Wed Sep 23 13:47:42 2020: graph reorder: new port 'system:playback_1'
+Wed Sep 23 13:47:42 2020: graph reorder: new port 'system:playback_2'
+Wed Sep 23 13:47:42 2020: New client 'PulseAudio JACK Sink' with PID 1545
+Wed Sep 23 13:47:42 2020: Connecting 'PulseAudio JACK Sink:front-left' to 'system:playback_1'
+Wed Sep 23 13:47:42 2020: Connecting 'PulseAudio JACK Sink:front-right' to 'system:playback_2'
+Wed Sep 23 13:47:42 2020: New client 'PulseAudio JACK Source' with PID 1545
+Wed Sep 23 13:47:42 2020: Connecting 'system:capture_1' to 'PulseAudio JACK Source:front-left'
+Wed Sep 23 13:47:42 2020: Connecting 'system:capture_2' to 'PulseAudio JACK Source:front-right'
+Wed Sep 23 13:47:44 2020: Saving settings to "/home/sirivasv/.config/jack/conf.xml" ...
+13:47:44.506 JACK connection change.
+13:47:44.506 Server configuration saved to "/home/sirivasv/.jackdrc".
+13:47:44.507 Statistics reset.
+13:47:44.518 Client activated.
+13:47:44.519 Patchbay deactivated.
+13:47:44.519 Post-startup script...
+13:47:44.519 /home/sirivasv/jack_startup
+13:47:44.566 JACK connection graph change.
+13:47:45.056 Post-startup script terminated successfully.
+13:47:45.057 JACK connection change.
+Wed Sep 23 13:47:44 2020: New client 'qjackctl' with PID 5956
+Wed Sep 23 13:47:44 2020: New client 'PulseAudio JACK Sink-01' with PID 1545
+Wed Sep 23 13:47:44 2020: Connecting 'PulseAudio JACK Sink-01:front-left' to 'system:playback_1'
+Wed Sep 23 13:47:44 2020: Connecting 'PulseAudio JACK Sink-01:front-right' to 'system:playback_2'
+Wed Sep 23 13:47:44 2020: New client 'PulseAudio JACK Source-01' with PID 1545
+Wed Sep 23 13:47:44 2020: Connecting 'system:capture_1' to 'PulseAudio JACK Source-01:front-left'
+Wed Sep 23 13:47:44 2020: Connecting 'system:capture_2' to 'PulseAudio JACK Source-01:front-right'
+13:57:32.740 JACK connection change.
+Wed Sep 23 13:57:32 2020: Connecting 'system:capture_1' to 'system:playback_1'
+13:57:38.141 JACK connection change.
+Wed Sep 23 13:57:38 2020: Disconnecting 'system:capture_1' from 'system:playback_1'
+13:58:10.371 JACK connection change.
+Wed Sep 23 13:58:10 2020: Connecting 'system:capture_1' to 'system:playback_1'
+13:58:12.910 JACK connection change.
+Wed Sep 23 13:58:12 2020: Connecting 'system:capture_2' to 'system:playback_2'
+13:58:21.907 JACK connection change.
+Wed Sep 23 13:58:21 2020: Disconnecting 'system:capture_2' from 'system:playback_2'
+13:58:25.676 JACK connection change.
+13:58:25.707 JACK connection graph change.
+Wed Sep 23 13:58:25 2020: Disconnecting 'system:capture_1' from 'system:playback_1'
+13:59:00.716 JACK connection change.
+Wed Sep 23 13:59:00 2020: Connecting 'system:capture_1' to 'system:playback_1'
+13:59:02.335 JACK connection change.
+Wed Sep 23 13:59:02 2020: Connecting 'system:capture_2' to 'system:playback_1'
+13:59:06.837 JACK connection change.
+Wed Sep 23 13:59:06 2020: Disconnecting 'system:capture_2' from 'system:playback_1'
+13:59:08.548 JACK connection change.
+Wed Sep 23 13:59:08 2020: Disconnecting 'system:capture_1' from 'system:playback_1'
+13:59:35.221 JACK connection graph change.
+13:59:35.339 JACK connection change.
+Wed Sep 23 13:59:35 2020: New client 'jack_simple_client' with PID 6607
+Wed Sep 23 13:59:35 2020: Connecting 'jack_simple_client:output1' to 'system:playback_1'
+Wed Sep 23 13:59:35 2020: Connecting 'jack_simple_client:output2' to 'system:playback_2'
+13:59:37.440 JACK connection graph change.
+13:59:37.554 JACK connection change.
+Wed Sep 23 13:59:37 2020: Disconnecting 'jack_simple_client:output1' from 'system:playback_1'
+Wed Sep 23 13:59:37 2020: Disconnecting 'jack_simple_client:output2' from 'system:playback_2'
+Wed Sep 23 13:59:37 2020: Client 'jack_simple_client' with PID 6607 is out
+14:00:22.239 JACK connection graph change.
+14:00:22.282 JACK connection change.
+14:00:22.282 JACK connection graph change.
+Wed Sep 23 14:00:22 2020: New client 'jack_simple_client' with PID 6619
+Wed Sep 23 14:00:22 2020: Connecting 'jack_simple_client:output1' to 'system:playback_1'
+Wed Sep 23 14:00:22 2020: Connecting 'jack_simple_client:output2' to 'system:playback_2'
+14:00:28.650 JACK connection graph change.
+14:00:28.702 JACK connection change.
+Wed Sep 23 14:00:28 2020: Disconnecting 'jack_simple_client:output1' from 'system:playback_1'
+Wed Sep 23 14:00:28 2020: Disconnecting 'jack_simple_client:output2' from 'system:playback_2'
+Wed Sep 23 14:00:28 2020: Client 'jack_simple_client' with PID 6619 is out
+14:00:30.730 JACK connection graph change.
+14:00:30.914 JACK connection change.
+Wed Sep 23 14:00:30 2020: New client 'jack_simple_client' with PID 6626
+Wed Sep 23 14:00:30 2020: Connecting 'jack_simple_client:output1' to 'system:playback_1'
+Wed Sep 23 14:00:30 2020: Connecting 'jack_simple_client:output2' to 'system:playback_2'
+14:00:41.933 JACK connection change.
+Wed Sep 23 14:00:41 2020: Disconnecting 'jack_simple_client:output2' from 'system:playback_2'
+14:00:52.957 JACK connection change.
+Wed Sep 23 14:00:52 2020: Disconnecting 'jack_simple_client:output1' from 'system:playback_1'
+14:01:06.443 JACK connection graph change.
+14:01:06.636 JACK connection change.
+Wed Sep 23 14:01:06 2020: Client 'jack_simple_client' with PID 6626 is out
+14:25:20.268 JACK connection graph change.
+14:25:20.439 JACK connection change.
+Wed Sep 23 14:25:20 2020: New client 'in_to_out' with PID 7200
+Wed Sep 23 14:25:20 2020: Connecting 'system:capture_1' to 'in_to_out:input'
+Wed Sep 23 14:25:20 2020: Connecting 'in_to_out:output' to 'system:playback_1'
+14:26:34.928 JACK connection change.
+Wed Sep 23 14:26:34 2020: Connecting 'in_to_out:output' to 'system:playback_2'
+14:26:37.311 JACK connection change.
+Wed Sep 23 14:26:37 2020: Disconnecting 'in_to_out:output' from 'system:playback_2'
+14:26:40.527 JACK connection change.
+Wed Sep 23 14:26:40 2020: Disconnecting 'in_to_out:output' from 'system:playback_1'
+14:26:47.031 JACK connection change.
+Wed Sep 23 14:26:47 2020: Connecting 'in_to_out:output' to 'system:playback_1'
+14:26:57.511 JACK connection graph change.
+Wed Sep 23 14:26:57 2020: Disconnecting 'system:capture_1' from 'in_to_out:input'
+Wed Sep 23 14:26:57 2020: Disconnecting 'in_to_out:output' from 'system:playback_1'
+Wed Sep 23 14:26:57 2020: ERROR: Failed to find port 'in_to_out:input' to destroy
+Wed Sep 23 14:26:57 2020: ERROR: Failed to find port 'in_to_out:output' to destroy
+Wed Sep 23 14:26:57 2020: Client 'in_to_out' with PID 7200 is out
+14:26:57.570 JACK connection change.
+14:27:34.008 JACK connection graph change.
+14:27:34.062 JACK connection change.
+Wed Sep 23 14:27:33 2020: New client 'in_to_out' with PID 7279
+Wed Sep 23 14:27:34 2020: Connecting 'system:capture_1' to 'in_to_out:input'
+Wed Sep 23 14:27:34 2020: Connecting 'in_to_out:output' to 'system:playback_1'
+14:27:36.510 JACK connection graph change.
+Wed Sep 23 14:27:36 2020: Disconnecting 'system:capture_1' from 'in_to_out:input'
+Wed Sep 23 14:27:36 2020: Disconnecting 'in_to_out:output' from 'system:playback_1'
+Wed Sep 23 14:27:36 2020: ERROR: Failed to find port 'in_to_out:input' to destroy
+Wed Sep 23 14:27:36 2020: ERROR: Failed to find port 'in_to_out:output' to destroy
+Wed Sep 23 14:27:36 2020: Client 'in_to_out' with PID 7279 is out
+14:27:36.673 JACK connection change.
+14:27:40.237 JACK connection graph change.
+14:27:40.284 JACK connection change.
+Wed Sep 23 14:27:40 2020: New client 'in_to_out' with PID 7318
+Wed Sep 23 14:27:40 2020: Connecting 'system:capture_1' to 'in_to_out:input'
+Wed Sep 23 14:27:40 2020: Connecting 'in_to_out:output' to 'system:playback_1'
+14:27:54.332 JACK connection graph change.
+14:27:54.533 JACK connection change.
+Wed Sep 23 14:27:54 2020: Disconnecting 'system:capture_1' from 'in_to_out:input'
+Wed Sep 23 14:27:54 2020: Disconnecting 'in_to_out:output' from 'system:playback_1'
+Wed Sep 23 14:27:54 2020: ERROR: Failed to find port 'in_to_out:input' to destroy
+Wed Sep 23 14:27:54 2020: ERROR: Failed to find port 'in_to_out:output' to destroy
+Wed Sep 23 14:27:54 2020: Client 'in_to_out' with PID 7318 is out
+14:28:34.447 JACK connection graph change.
+Wed Sep 23 14:28:34 2020: New client 'in_to_out' with PID 7396
+Wed Sep 23 14:28:34 2020: Connecting 'system:capture_1' to 'in_to_out:input'
+Wed Sep 23 14:28:34 2020: Connecting 'in_to_out:output' to 'system:playback_1'
+14:28:34.633 JACK connection change.
+14:28:36.178 JACK connection graph change.
+14:28:36.246 JACK connection change.
+Wed Sep 23 14:28:36 2020: Disconnecting 'system:capture_1' from 'in_to_out:input'
+Wed Sep 23 14:28:36 2020: Disconnecting 'in_to_out:output' from 'system:playback_1'
+Wed Sep 23 14:28:36 2020: ERROR: Failed to find port 'in_to_out:input' to destroy
+Wed Sep 23 14:28:36 2020: ERROR: Failed to find port 'in_to_out:output' to destroy
+Wed Sep 23 14:28:36 2020: Client 'in_to_out' with PID 7396 is out
+14:32:04.068 Client deactivated.
+14:32:04.071 Shutdown script...
+14:32:04.071 /home/sirivasv/jack_shutdown
+14:32:04.511 Shutdown script terminated successfully.
+14:32:04.568 D-BUS: JACK server is stopping...
+14:32:04.569 D-BUS: JACK server was stopped (org.jackaudio.service aka jackdbus).
+Wed Sep 23 14:32:04 2020: Client 'qjackctl' with PID 5956 is out
+Wed Sep 23 14:32:04 2020: Disconnecting 'PulseAudio JACK Sink-01:front-left' from 'system:playback_1'
+Wed Sep 23 14:32:04 2020: Disconnecting 'PulseAudio JACK Sink-01:front-right' from 'system:playback_2'
+Wed Sep 23 14:32:04 2020: Client 'PulseAudio JACK Sink-01' with PID 1545 is out
+Wed Sep 23 14:32:04 2020: Disconnecting 'system:capture_1' from 'PulseAudio JACK Source-01:front-left'
+Wed Sep 23 14:32:04 2020: Disconnecting 'system:capture_2' from 'PulseAudio JACK Source-01:front-right'
+Wed Sep 23 14:32:04 2020: Client 'PulseAudio JACK Source-01' with PID 1545 is out
+Wed Sep 23 14:32:04 2020: Stopping jack server...
+Wed Sep 23 14:32:04 2020: Client 'system' with PID 0 is out
+Wed Sep 23 14:32:04 2020: Client 'PulseAudio JACK Sink' with PID 1545 is out
+Wed Sep 23 14:32:04 2020: Client 'PulseAudio JACK Source' with PID 1545 is out
+Wed Sep 23 14:32:04 2020: ERROR: Cannot write socket fd = 21 err = Broken pipe
+Wed Sep 23 14:32:04 2020: ERROR: CheckRes error
+Wed Sep 23 14:32:04 2020: ERROR: Could not write notification
+Wed Sep 23 14:32:04 2020: ERROR: ClientNotify fails name = system notification = 1 val1 = 0 val2 = 0
+Wed Sep 23 14:32:04 2020: Released audio card Audio0
+Wed Sep 23 14:32:04 2020: ERROR: Cannot write socket fd = 17 err = Broken pipe
+Wed Sep 23 14:32:04 2020: ERROR: CheckRes error
+Wed Sep 23 14:32:04 2020: ERROR: Could not write notification
+Wed Sep 23 14:32:04 2020: ERROR: ClientNotify fails name = freewheel notification = 1 val1 = 0 val2 = 0
+Wed Sep 23 14:32:04 2020: ERROR: Cannot write socket fd = 21 err = Broken pipe
+Wed Sep 23 14:32:04 2020: ERROR: CheckRes error
+Wed Sep 23 14:32:04 2020: ERROR: Could not write notification
+Wed Sep 23 14:32:04 2020: ERROR: ClientNotify fails name = freewheel notification = 1 val1 = 0 val2 = 0
+14:32:05.584 Logging stopped --- mié. sep 23 14:32:05 2020 ---

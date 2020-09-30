@@ -9,9 +9,18 @@
 
 #include <jack/jack.h>
 
-jack_port_t *input_port;
-jack_port_t *output_port;
+
+// Doble apuntador
+jack_port_t **input_ports;
+jack_port_t **output_ports;
 jack_client_t *client;
+
+const unsigned int NUM_PORTS = 2;
+
+// global variables for delaying output
+jack_default_audio_sample_t *delay_buffer;
+unsigned int delay_buffer_i = 0;
+unsigned int delay_samples;
 
 /**
  * The process callback for this JACK application is called in a
@@ -21,18 +30,35 @@ jack_client_t *client;
  * port to its output port. It will exit when stopped by 
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
-int jack_callback (jack_nframes_t nframes, void *arg){
-	jack_default_audio_sample_t *in, *out;
+int jack_callback (jack_nframes_t nframes, void *arg) {
+
+	int i, j;
+  jack_default_audio_sample_t **in, **out;	
+  
+  in = malloc(NUM_PORTS * sizeof(jack_default_audio_sample_t*));
+  out = malloc(NUM_PORTS * sizeof(jack_default_audio_sample_t*));
+  for (j = 0; j < NUM_PORTS; ++j) {
+    in[j] = jack_port_get_buffer (input_ports[j], nframes);
+    out[j] = jack_port_get_buffer (output_ports[j], nframes);
+  }
+
+  
+  for (i = 0; i < nframes; ++i) {
+    // Untouched out
+    out[0][i] = in[0][i];
+
+    // modified
+    out[1][i] = delay_buffer[delay_buffer_i];
+    delay_buffer[delay_buffer_i] = in[0][i];
+    delay_buffer_i++;
+    if (delay_buffer_i >= delay_samples)
+      delay_buffer_i = 0;
+      
+  }
 	
-	in = jack_port_get_buffer (input_port, nframes);
-	out = jack_port_get_buffer (output_port, nframes);
-	
-	memcpy (out, in, nframes * sizeof (jack_default_audio_sample_t));
-	// for (int i = 0; i < nframes; ++i) {
-	// 	out[i] = in[i];
-	// }
-	//printf(" %f ",(double)out[0]);
-	return 0;
+  // memcpy (out_1, in_1, nframes * sizeof (jack_default_audio_sample_t));
+
+  return 0;
 }
 
 
@@ -46,10 +72,27 @@ void jack_shutdown (void *arg){
 
 
 int main (int argc, char *argv[]) {
-	const char *client_name = "in_to_out";
+	const char *client_name = "in_to_out_mod_1";
 	jack_options_t options = JackNoStartServer;
 	jack_status_t status;
-	
+
+  if (argc < 2) {
+    printf("I need the samples to delay the input.\n");
+    exit(1);
+  }
+
+  // Read from string a number
+  sscanf(argv[1],"%d",&delay_samples);
+
+  // from string to int
+  // delay_samples = atoi(argv[1])
+
+  printf("Going to delay by %d samples\n", delay_samples);
+  delay_buffer = (jack_default_audio_sample_t *) malloc(delay_samples * sizeof(jack_default_audio_sample_t));
+  int i;
+  for (i = 0; i < delay_samples; ++i) delay_buffer[i] = 0;
+
+
 	/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status);
 	if (client == NULL){
@@ -79,18 +122,29 @@ int main (int argc, char *argv[]) {
 	/* display the current sample rate. */
 	printf ("Engine sample rate: %d\n", jack_get_sample_rate (client));
 	
+	/* allocate memory for ports */
+    input_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
+    output_ports = malloc(NUM_PORTS * sizeof (jack_port_t*));
+    char port_name[10];
+
+	/* create the agents for input port */
+	for (int i = 0; i < NUM_PORTS; ++i) {
+        sprintf(port_name, "input_%d", (i+1));
+        input_ports[i] = jack_port_register (client, port_name, JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
+    }
 	
-	/* create the agent input port */
-	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
-	
-	/* create the agent output port */
-	output_port = jack_port_register (client, "output",JACK_DEFAULT_AUDIO_TYPE,JackPortIsOutput, 0);
+	/* create the agents output port */
+    for (int i = 0; i < NUM_PORTS; ++i) {
+        sprintf(port_name, "output_%d", (i+1));
+        output_ports[i] = jack_port_register (client, port_name,JACK_DEFAULT_AUDIO_TYPE,JackPortIsOutput, 0);
+    }
 	
 	/* check that both ports were created succesfully */
-	if ((input_port == NULL) || (output_port == NULL)) {
-		printf("Could not create agent ports. Have we reached the maximum amount of JACK agent ports?\n");
-		exit (1);
-	}
+    // Put this if on the fors
+	// if ((input_port_1 == NULL) || (input_port_2 == NULL) || (output_port_1 == NULL) || (output_port_2 == NULL)) {
+	// 	printf("Could not create agent ports. Have we reached the maximum amount of JACK agent ports?\n");
+	// 	exit (1);
+	// }
 	
 	
 	/* Tell the JACK server that we are ready to roll.
@@ -119,14 +173,19 @@ int main (int argc, char *argv[]) {
 		printf("No available physical capture (server output) ports.\n");
 		exit (1);
 	}
-	// Connect the first available to our input port
-	if (jack_connect (client, serverports_names[0], jack_port_name (input_port))) {
-		printf("Cannot connect input port.\n");
-		exit (1);
-	}
-	// free serverports_names variable for reuse in next part of the code
-	free (serverports_names);
-	
+
+    for (int i = 0; i < NUM_PORTS; ++i) {
+
+        // Connect the available ports to our input ports
+        if (jack_connect (client, serverports_names[i], jack_port_name (input_ports[i]))) {
+            printf("Cannot connect input port %d.\n", i);
+            exit (1);
+        }
+
+    }
+    
+    // free serverports_names variable for reuse in next part of the code
+	free (serverports_names);	
 	
 	/* Assign our output port to a server input port*/
 	// Find possible input server port names
@@ -135,24 +194,29 @@ int main (int argc, char *argv[]) {
 		printf("No available physical playback (server input) ports.\n");
 		exit (1);
 	}
-	// Connect the first available to our output port
-	if (jack_connect (client, jack_port_name (output_port), serverports_names[0])) {
-		printf ("Cannot connect output ports.\n");
-		exit (1);
-	}
-	// free serverports_names variable, we're not going to use it again
-	free (serverports_names);
+
+    for (int i = 0; i < NUM_PORTS; ++i) {
+
+        // Connect available to our output ports 
+        if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
+            printf ("Cannot connect output port 1.\n");
+            exit (1);
+        }
+
+    }
 	
+    // free serverports_names variable, we're not going to use it again
+	free (serverports_names);
 	
 	printf ("done.\n");
 	/* keep running until stopped by the user */
 	sleep (-1);
 	
-	
 	/* this is never reached but if the program
 	   had some other way to exit besides being killed,
 	   they would be important to call.
 	*/
+
 	jack_client_close (client);
 	exit (0);
 }
