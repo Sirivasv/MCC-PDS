@@ -94,8 +94,6 @@ int main (int argc, char *argv[]) {
 
   // from string to int
   // delay_samples = atoi(argv[1])
-
-  printf("Going to delay by %d samples\n", delay_samples);
   delay_buffer = (jack_default_audio_sample_t *) malloc(delay_samples * sizeof(jack_default_audio_sample_t));
   int i;
   for (i = 0; i < delay_samples; ++i) delay_buffer[i] = 0;
