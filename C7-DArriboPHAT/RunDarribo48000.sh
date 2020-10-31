@@ -1,0 +1,1 @@
+make && ./darriboOut & bash RunMics2Clean48000.sh

@@ -1,0 +1,1 @@
+sleep 2 && ./ReadMicWavs darribo input_ /media/sirivasv/DATAL/MCC/MCCUTILS/corpus44100/clean-1source/ 2

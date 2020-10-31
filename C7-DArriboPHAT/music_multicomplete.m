@@ -21,6 +21,8 @@ r = 2;              %number of signals in signal sub-space
 s1 = exp(j*(2*pi*freq*t));
 s2 = exp(j*(2*pi*0.75*freq*t));
 
+
+
 N = 3;              %number of microphones
 steer = zeros(N,r);
 steer(1,:) = [1 1];    %first microphones is reference, no delay
@@ -70,3 +72,5 @@ end
 
 figure(2)
 plot(angles,abs(music_spectrum))
+
+figure(3); plot(t, [s1; s2]); axis([min(t) max(t) -2 2]); title('ORIGINALS')
