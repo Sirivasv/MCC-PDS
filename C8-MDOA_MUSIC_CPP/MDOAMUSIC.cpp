@@ -33,20 +33,38 @@ double sample_rate;
 double *hann;
 const double MY_PI = 3.14159265358979323846264338327950288;
 const std::complex<double> COMP_I(0.0, 1.0);
-const int WINDOW_MEM_LEN = 3;
+const int WINDOW_MEM_LEN = 5;
+const double MIC_DIST = 0.18;
+const double SOUND_SPEED = 343.0;
 
-const double FREQ_LOW_RANGE = 100;
-const double FREQ_HIGH_RANGE = 260;
-const int FREQS_RES_LEN = 4;
+const double FREQ_LOW_RANGE = 50;
+const double FREQ_HIGH_RANGE = 300;
+const int FREQS_RES_LEN = 16;
+
 const int OUT_SYSTEM_PORTS = 2;
+const int INPUT_SIGNALS = 2;
+const int NOISE_SPACES = 1;
+const double ANGLE_LOW_RANGE = -90.0;
+const double ANGLE_HIGH_RANGE = 90.0;
+const double ANGLE_STEP = 5.0;
+
+// FULL
 // const double FREQ_LOW_RANGE = 0;
 // const double FREQ_HIGH_RANGE = 22050;
 // const int FREQS_RES_LEN = 100;
+
+// VOICE
+// const double FREQ_LOW_RANGE = 100;
+// const double FREQ_HIGH_RANGE = 260;
+// const int FREQS_RES_LEN = 4;
 
 // MUSIC  Requirements
 std::complex<double> ***signal_FFT_MEM;
 int window_mem_current_id = 0;
 std::vector<int> freqs_res_values;
+std::vector<double> angle_values;
+std::vector<std::vector<std::complex<double>>> angle_delays2;
+std::vector<std::vector<std::complex<double>>> angle_delays3;
 
 std::complex<double> **signal_FFT, **signal_IFFT, **signal_CONJ, *signal_CONJPROD, *signal_ABSCONJPROD, *signal_CCVPHATFFT;
 double *signal_NORM, **signal_CENTER, **signal_WINDOW, *resultCCV, *signal_CCVIFFT;
@@ -233,7 +251,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
     }
 
-	for (i = 0; i < freqs_res_values.size(); ++i){
+	std::vector<std::vector<double>> music_spectrum;
+	for (int freq_i = 0; freq_i < freqs_res_values.size(); ++freq_i){
 
 		Eigen::MatrixXcd X_MATR(ports_number,WINDOW_MEM_LEN);
 		for (int mic_i = 0; mic_i < ports_number; ++mic_i) {
@@ -246,7 +265,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				}
 
 			
-				X_MATR(mic_i,curr_saved_window_id) = signal_FFT_MEM[window_mem_current_id][mic_i][i];
+				X_MATR(mic_i,curr_saved_window_id) = signal_FFT_MEM[window_mem_current_id][mic_i][freq_i];
 			}
 		}
 
@@ -254,12 +273,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		R_MAT = X_MATR * X_MATR.adjoint();
 
 		Eigen::ComplexEigenSolver<Eigen::MatrixXcd> es_c(R_MAT);
-		std::cout << "--- The eigenvalues of C are:\n" << es_c.eigenvalues() << std::endl << std::endl;
-		std::cout << "--- The abs of C(0) are:\n" << abs(es_c.eigenvalues()(0))<< std::endl << std::endl;
-		std::cout << "--- The abs of C(1) are:\n" << abs(es_c.eigenvalues()(1))<< std::endl << std::endl;
-		std::cout << "--- The abs of C(2) are:\n" << abs(es_c.eigenvalues()(2))<< std::endl << std::endl;
-		std::cout << "--- The eigenvectors of C are (one vector per column):\n" << es_c.eigenvectors() << std::endl << std::endl;
-		std::cout << "--- The first eigenvector:\n" << es_c.eigenvectors().col(0) << std::endl << std::endl;
+		// std::cout << "--- The eigenvalues of C are:\n" << es_c.eigenvalues() << std::endl << std::endl;
+		// std::cout << "--- The abs of C(0) are:\n" << abs(es_c.eigenvalues()(0))<< std::endl << std::endl;
+		// std::cout << "--- The abs of C(1) are:\n" << abs(es_c.eigenvalues()(1))<< std::endl << std::endl;
+		// std::cout << "--- The abs of C(2) are:\n" << abs(es_c.eigenvalues()(2))<< std::endl << std::endl;
+		// std::cout << "--- The eigenvectors of C are (one vector per column):\n" << es_c.eigenvectors() << std::endl << std::endl;
+		// std::cout << "--- The first eigenvector:\n" << es_c.eigenvectors().col(0) << std::endl << std::endl;
 		
 		std::vector<std::pair<double, int>> eigen_values_to_sort;
 		for (int mic_i = 0; mic_i < ports_number; ++mic_i) {
@@ -267,11 +286,76 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 		std::sort (eigen_values_to_sort.begin(), eigen_values_to_sort.end());
 		std::reverse(eigen_values_to_sort.begin(),eigen_values_to_sort.end());
-		std::cout << "eigen_values_to_sort contains:";
+		// std::cout << "eigen_values_to_sort contains:";
 		for (std::vector<std::pair<double, int>>::iterator it=eigen_values_to_sort.begin(); it!=eigen_values_to_sort.end(); ++it){
-			std::cout << "( " << (*it).first << ' ' << (*it).second << " )";
+			// std::cout << "( " << (*it).first << ' ' << (*it).second << " )";
 		}
-		std::cout << '\n';
+		// std::cout << '\n';
+		Eigen::MatrixXcd Qs(ports_number, INPUT_SIGNALS);
+		for (int i = 0; i < ports_number; ++i) {
+			for (int j = 0; j < INPUT_SIGNALS; ++j) {
+				Qs(i,j) = es_c.eigenvectors().col(eigen_values_to_sort[j].second)(i);
+			}
+		}
+		Eigen::MatrixXcd Qn(ports_number, NOISE_SPACES);
+		for (int i = 0; i < ports_number; ++i) {
+			for (int j = 0; j < NOISE_SPACES; ++j) {
+				Qn(i,j) = es_c.eigenvectors().col(eigen_values_to_sort[((int)eigen_values_to_sort.size()) - j - 1].second)(i);
+			}
+		}
+		
+		// std::cout << "--- Complex Number Matrix Qs:\n" << Qs << std::endl << std::endl;
+		// std::cout << "--- Complex Number Matrix Qn:\n" << Qn << std::endl << std::endl;
+		// std::cout << "--- Complex Number Matrix X_MATR:\n" << X_MATR << std::endl << std::endl;
+
+		// compute MUSIC spectrum
+		// std::vector<double> current_spectrum;
+		// std::cout << "[";
+		// for (int i = 0; i < (int)angle_values.size(); ++i) {
+		 	// std::cout << angle_values[i] << ", ";
+		// }
+		// std::cout << "]\n";
+		// std::cout << "[";
+		std::vector<double> best_aod;
+		double previous_music_value = -1e25;
+		double previous_angle = 0.0;
+		int flag = 1;
+		for (int i = 0; i < (int)angle_values.size(); ++i) {
+			Eigen::MatrixXcd a1(ports_number, 1);
+			a1(0,0) = std::complex<double>(1.0, 0.0);
+			a1(1,0) = angle_delays2[freq_i][i];
+			a1(2,0) = angle_delays3[freq_i][i];
+			
+			
+			double current_music_value = std::real((a1.adjoint() * a1)(0,0)) / std::real((a1.adjoint()*Qn*Qn.adjoint()*a1)(0,0));
+			
+			if (flag == 1) { // scaling up
+				if (current_music_value < previous_music_value) {
+					best_aod.push_back(previous_angle);
+					flag = 0;
+				}
+			} else { // scaling down
+				if (current_music_value > previous_music_value) {
+					flag = 1;
+				}
+			}
+			previous_music_value = current_music_value;
+			previous_angle = angle_values[i];
+			// std::cout << current_music_value << ", ";
+			// current_spectrum.push_back(current_music_value);
+		}
+		if (best_aod.size() == 0) {
+			best_aod.push_back(previous_angle);
+			best_aod.push_back(previous_angle);
+		}
+		if (best_aod.size() == 1) {
+			best_aod.push_back(previous_angle);
+		}
+		// std::cout << "]\n";
+		printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", best_aod[0]);
+		printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", best_aod[1]);
+		printf("FRECUENCIA ACTUAL = %lf\n", freqs[freqs_res_values[freq_i]]);
+		// music_spectrum.push_back(current_spectrum);
 	}
 
 	window_mem_current_id += 1;
@@ -303,26 +387,6 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	// 	}
 	// }
 	
-	// WARNING TEST START
-	double max_val = 0;
-	int max_i = 0;
-	// WARNING TEST END
-	
-	printf("******************************************\n");
-	printf("max_val = %lf /// max_i = %d\n", max_val, max_i);
-	int delay;
-	if ( max_i < (sub_buffer_size / 2)) {
-		delay = max_i - 1;
-	} else {
-		delay = sub_buffer_size - max_i - 1;
-	}
-
-	printf("DESFASE = %d\n", delay);
-	double delay_in_seconds = ((double)delay) / ((double)sample_rate);
-	printf("DESFASE en segundos = %lf\n", delay_in_seconds);
-	double angle_of_direction = (asin((343.0 * delay_in_seconds) / 0.18) * 180.0) / MY_PI;
-	printf("DIRECCION DE ARRIBO en grados = %lf\n", angle_of_direction);
-	fflush(stdout);
 	return 0;
 }
 
@@ -467,6 +531,26 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
+	// ANGLES
+	for (int j = 0; j < freqs_res_values.size(); ++j) {
+		double curr_angle = ANGLE_LOW_RANGE;
+		std::vector<std::complex<double>> current_delays2;
+		std::vector<std::complex<double>> current_delays3;
+		while (curr_angle <= ANGLE_HIGH_RANGE) {
+
+			if (j == 0) {
+				angle_values.push_back(curr_angle);
+			}
+			
+			std::complex<double> freq_res_complex = std::complex<double>(freqs[freqs_res_values[j]],0.0);
+			current_delays2.push_back(std::exp(-COMP_I*2.0*M_PI*(freq_res_complex)*(-MIC_DIST/SOUND_SPEED)*sin(curr_angle*MY_PI/180.0)));
+			current_delays3.push_back(std::exp(-COMP_I*2.0*M_PI*(freq_res_complex)*(-MIC_DIST/SOUND_SPEED)*cos((-150.0 - curr_angle)*MY_PI/180.0)));
+			curr_angle += ANGLE_STEP;
+
+		}
+		angle_delays2.push_back(current_delays2);
+		angle_delays3.push_back(current_delays3);
+	}
 	
 	// Create agent ports
     input_port = (jack_port_t**) malloc(ports_number * sizeof (jack_port_t*));
