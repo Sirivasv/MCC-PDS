@@ -45,7 +45,7 @@ const int OUT_SYSTEM_PORTS = 2;
 const int INPUT_SIGNALS = 2;
 const int NOISE_SPACES = 1;
 const double ANGLE_LOW_RANGE = -90.0;
-const double ANGLE_HIGH_RANGE = 90.0;
+const double ANGLE_HIGH_RANGE = 120.0;
 const double ANGLE_STEP = 5.0;
 
 // FULL
@@ -252,6 +252,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
     }
 
 	std::vector<std::vector<double>> music_spectrum;
+	double mat_val = 0.0;
+	double mint_val = 0.0;
+	double mt_cnt = 0.0;
+
 	for (int freq_i = 0; freq_i < freqs_res_values.size(); ++freq_i){
 
 		Eigen::MatrixXcd X_MATR(ports_number,WINDOW_MEM_LEN);
@@ -352,11 +356,22 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			best_aod.push_back(previous_angle);
 		}
 		// std::cout << "]\n";
-		printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", best_aod[0]);
-		printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", best_aod[1]);
-		printf("FRECUENCIA ACTUAL = %lf\n", freqs[freqs_res_values[freq_i]]);
+		// printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", best_aod[0]);
+		// printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", best_aod[1]);
+		// printf("FRECUENCIA ACTUAL = %lf\n", freqs[freqs_res_values[freq_i]]);
 		// music_spectrum.push_back(current_spectrum);
+		if (best_aod[0] < best_aod[1]) {
+			mat_val += best_aod[1];
+			mint_val += best_aod[0];
+		} else {
+			mat_val += best_aod[0];
+			mint_val += best_aod[1];
+		}
+		mt_cnt += 1.0;
 	}
+
+	printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", mint_val / mt_cnt);
+	printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", mat_val / mt_cnt);
 
 	window_mem_current_id += 1;
 	if (window_mem_current_id >= WINDOW_MEM_LEN) window_mem_current_id = 0;
