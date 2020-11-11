@@ -37,15 +37,15 @@ const int WINDOW_MEM_LEN = 5;
 const double MIC_DIST = 0.18;
 const double SOUND_SPEED = 343.0;
 
-const double FREQ_LOW_RANGE = 50;
-const double FREQ_HIGH_RANGE = 300;
+const double FREQ_LOW_RANGE = 20;
+const double FREQ_HIGH_RANGE = 800;
 const int FREQS_RES_LEN = 16;
 
 const int OUT_SYSTEM_PORTS = 2;
 const int INPUT_SIGNALS = 2;
 const int NOISE_SPACES = 1;
 const double ANGLE_LOW_RANGE = -90.0;
-const double ANGLE_HIGH_RANGE = 120.0;
+const double ANGLE_HIGH_RANGE = 100.0;
 const double ANGLE_STEP = 5.0;
 
 // FULL
@@ -313,13 +313,13 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		// std::cout << "--- Complex Number Matrix X_MATR:\n" << X_MATR << std::endl << std::endl;
 
 		// compute MUSIC spectrum
-		// std::vector<double> current_spectrum;
-		// std::cout << "[";
-		// for (int i = 0; i < (int)angle_values.size(); ++i) {
-		 	// std::cout << angle_values[i] << ", ";
-		// }
-		// std::cout << "]\n";
-		// std::cout << "[";
+		std::vector<double> current_spectrum;
+		std::cout << "[";
+		for (int i = 0; i < (int)angle_values.size(); ++i) {
+		 	std::cout << angle_values[i] << ", ";
+		}
+		std::cout << "]\n";
+		std::cout << "[";
 		std::vector<double> best_aod;
 		double previous_music_value = -1e25;
 		double previous_angle = 0.0;
@@ -345,8 +345,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			}
 			previous_music_value = current_music_value;
 			previous_angle = angle_values[i];
-			// std::cout << current_music_value << ", ";
-			// current_spectrum.push_back(current_music_value);
+			std::cout << current_music_value << ", ";
+			current_spectrum.push_back(current_music_value);
 		}
 		if (best_aod.size() == 0) {
 			best_aod.push_back(previous_angle);
@@ -355,11 +355,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		if (best_aod.size() == 1) {
 			best_aod.push_back(previous_angle);
 		}
-		// std::cout << "]\n";
+		std::cout << "]\n";
 		// printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", best_aod[0]);
 		// printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", best_aod[1]);
 		// printf("FRECUENCIA ACTUAL = %lf\n", freqs[freqs_res_values[freq_i]]);
-		// music_spectrum.push_back(current_spectrum);
+		music_spectrum.push_back(current_spectrum);
 		if (best_aod[0] < best_aod[1]) {
 			mat_val += best_aod[1];
 			mint_val += best_aod[0];
@@ -372,6 +372,52 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", mint_val / mt_cnt);
 	printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", mat_val / mt_cnt);
+
+	std::vector<double> compressed_music;
+	int lim_spectrums = music_spectrum.size();
+	int lim_per_spectrum = music_spectrum[0].size();
+	for (int pos_i = 0; pos_i < lim_per_spectrum; ++pos_i) {
+		double current_value_i = 0.0;
+		for (int spectrum_i = 0; spectrum_i < lim_spectrums; ++spectrum_i) {
+			current_value_i += music_spectrum[spectrum_i][pos_i];
+		}
+		compressed_music.push_back(current_value_i / (double)lim_spectrums);
+		// compressed_music.push_back(current_value_i);
+		// std::cout << current_music_value << ", ";
+	}
+
+	std::vector<double> best_aod;
+	std::cout << "[";
+	double previous_music_value = -1e25;
+	double previous_angle = 0.0;
+	int flag = 1;
+	int lim_compressed = compressed_music.size();
+	for (int pos_i = 0; pos_i < lim_compressed; ++pos_i) {
+		double current_music_value = compressed_music[pos_i];
+		std::cout << current_music_value << ", ";
+		if (flag == 1) { // scaling up
+			if (current_music_value < previous_music_value) {
+				best_aod.push_back(previous_angle);
+				flag = 0;
+			}
+		} else { // scaling down
+			if (current_music_value > previous_music_value) {
+				flag = 1;
+			}
+		}
+		previous_music_value = current_music_value;
+		previous_angle = angle_values[pos_i];
+	}
+	if (best_aod.size() == 0) {
+		best_aod.push_back(previous_angle);
+		best_aod.push_back(previous_angle);
+	}
+	if (best_aod.size() == 1) {
+		best_aod.push_back(previous_angle);
+	}
+	std::cout << "]\n";
+	printf("DIRECCION DE ARRIBO MEAN 1 en grados = %lf\n", best_aod[0]);
+	printf("DIRECCION DE ARRIBO MEAN 2 en grados = %lf\n", best_aod[1]);
 
 	window_mem_current_id += 1;
 	if (window_mem_current_id >= WINDOW_MEM_LEN) window_mem_current_id = 0;
