@@ -21,6 +21,9 @@
 // Eigen include
 #include <Eigen/Eigen>
 
+// Include unordered map
+#include<unordered_map>
+
 std::complex<double> *i_fft, *i_time, *o_fft, *o_time;
 fftw_plan i_forward, o_inverse;
 
@@ -71,6 +74,7 @@ double *signal_NORM, **signal_CENTER, **signal_WINDOW, *resultCCV, *signal_CCVIF
 
 unsigned int ports_number, sub_buffer_size;
 double *freqs;
+double *freqs_energies;
 
 
 void applyHann(jack_default_audio_sample_t *data, double *return_data) {
@@ -232,7 +236,6 @@ int jack_callback (jack_nframes_t nframes, void *arg){
         }
     }
     
-    
     for (port_i = 0; port_i < ports_number; ++port_i) {
         
 		// We Apply a Hann Window
@@ -245,11 +248,30 @@ int jack_callback (jack_nframes_t nframes, void *arg){
         FFTSignal(signal_CENTER[port_i], signal_FFT[port_i]);
 
 		// We save the FFT Matrix in memeory
-		for (int j = 0; j < freqs_res_values.size(); ++j) {
-			signal_FFT_MEM[window_mem_current_id][port_i][j] = i_fft[freqs_res_values[j]];
+		// for (int j = 0; j < freqs_res_values.size(); ++j) {
+		for (int j = 0; j < (sub_buffer_size/2 + 1); ++j) {
+			signal_FFT_MEM[window_mem_current_id][port_i][j] = i_fft[j];
+			freqs_energies[j] += abs(i_fft[j]);
 		}
 
     }
+
+	// Get relevant freqs
+	std::vector<std::pair<double, int>> freqs_energies_to_sort;
+	for (int j = 0; j < (sub_buffer_size/2 + 1); ++j) {
+		freqs_energies_to_sort.push_back(std::pair<double, int>(freqs_energies[j], j));
+		freqs_energies[j] = 0.0;
+	}
+	std::sort (freqs_energies_to_sort.begin(), freqs_energies_to_sort.end());
+	std::reverse(freqs_energies_to_sort.begin(),freqs_energies_to_sort.end());
+	freqs_res_values.clear();
+	std::cout << "++\n";
+	std::cout << "[";
+	for (int freq_res_i = 0; freq_res_i < FREQS_RES_LEN; ++freq_res_i) {
+		freqs_res_values.push_back(freqs_energies_to_sort[freq_res_i].second);
+		std::cout << freqs[freqs_energies_to_sort[freq_res_i].second] << ',';
+	}
+	std::cout << "]\n";
 
 	std::vector<std::vector<double>> music_spectrum;
 	double mat_val = 0.0;
@@ -269,7 +291,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				}
 
 			
-				X_MATR(mic_i,curr_saved_window_id) = signal_FFT_MEM[window_mem_current_id][mic_i][freq_i];
+				X_MATR(mic_i,curr_saved_window_id) = signal_FFT_MEM[window_mem_current_id][mic_i][freqs_res_values[freq_i]];
 			}
 		}
 
@@ -327,8 +349,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		for (int i = 0; i < (int)angle_values.size(); ++i) {
 			Eigen::MatrixXcd a1(ports_number, 1);
 			a1(0,0) = std::complex<double>(1.0, 0.0);
-			a1(1,0) = angle_delays2[freq_i][i];
-			a1(2,0) = angle_delays3[freq_i][i];
+			a1(1,0) = angle_delays2[freqs_res_values[freq_i]][i];
+			a1(2,0) = angle_delays3[freqs_res_values[freq_i]][i];
 			
 			
 			double current_music_value = std::real((a1.adjoint() * a1)(0,0)) / std::real((a1.adjoint()*Qn*Qn.adjoint()*a1)(0,0));
@@ -540,6 +562,7 @@ int main (int argc, char *argv[]) {
 
 	hann = (double *) calloc(sub_buffer_size, sizeof(double));
 	freqs = (double *) calloc(sub_buffer_size, sizeof(double));
+	freqs_energies = (double *) calloc(sub_buffer_size, sizeof(double));
 
 
 	// Calculate hann window
@@ -588,12 +611,13 @@ int main (int argc, char *argv[]) {
 		signal_FFT_MEM[i] = (std::complex<double> **) fftw_malloc(sizeof(std::complex<double>*) * ports_number);
 
 		for (int j = 0; j < ports_number; ++j){
-			signal_FFT_MEM[i][j] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * (int)freqs_res_values.size());
+			// signal_FFT_MEM[i][j] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * (int)freqs_res_values.size());
+			signal_FFT_MEM[i][j] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * sub_buffer_size);
 		}
 	}
 
 	// ANGLES
-	for (int j = 0; j < freqs_res_values.size(); ++j) {
+	for (int j = 0; j < sub_buffer_size; ++j) {
 		double curr_angle = ANGLE_LOW_RANGE;
 		std::vector<std::complex<double>> current_delays2;
 		std::vector<std::complex<double>> current_delays3;
@@ -603,7 +627,7 @@ int main (int argc, char *argv[]) {
 				angle_values.push_back(curr_angle);
 			}
 			
-			std::complex<double> freq_res_complex = std::complex<double>(freqs[freqs_res_values[j]],0.0);
+			std::complex<double> freq_res_complex = std::complex<double>(freqs[j],0.0);
 			current_delays2.push_back(std::exp(-COMP_I*2.0*M_PI*(freq_res_complex)*(-MIC_DIST/SOUND_SPEED)*cos((-90 - curr_angle)*MY_PI/180.0)));
 			current_delays3.push_back(std::exp(-COMP_I*2.0*M_PI*(freq_res_complex)*(-MIC_DIST/SOUND_SPEED)*cos((-150.0 - curr_angle)*MY_PI/180.0)));
 			curr_angle += ANGLE_STEP;
