@@ -193,6 +193,57 @@ void getAbs(std::complex<double> *data, std::complex<double> *return_data) {
 
 }
 
+std::vector<double> get_peaks_in_array(int many_peaks, std::vector<double> value_array) {
+	
+	int lim_varray = value_array.size();
+	
+	std::vector<double> peaks_to_return;
+	for (int i = 0; i < many_peaks; ++i) {
+		
+		// Get max value in array to determine peak
+		double greatest_music_value = -1e25;
+		int greatest_music_index = 0;
+		for (int pos_i = 0; pos_i < lim_varray; ++pos_i) {
+
+			if (value_array[pos_i] > greatest_music_value) {
+				greatest_music_value = value_array[pos_i];
+				greatest_music_index = pos_i;
+			}
+
+		}
+
+		// Insert peak at vector
+		peaks_to_return.push_back(angle_values[greatest_music_index]);
+
+		// Delete peak values to the left
+		double previous_value = value_array[greatest_music_index];
+		for (int pos_i = greatest_music_index - 1; pos_i >= 0; --pos_i) {
+			if (value_array[pos_i] <= previous_value) {
+				previous_value = value_array[pos_i];
+				value_array[pos_i] = -1;
+			} else {
+				break;
+			}
+		}
+
+		// Delete peak values to the right
+		previous_value = value_array[greatest_music_index];
+		for (int pos_i = greatest_music_index + 1; pos_i < lim_varray; ++pos_i) {
+			if (value_array[pos_i] <= previous_value) {
+				previous_value = value_array[pos_i];
+				value_array[pos_i] = -1;
+			} else {
+				break;
+			}
+		}
+
+		// supress peak
+		value_array[greatest_music_index] = -1;
+	}
+	
+	return peaks_to_return;
+}
+
 // void filter(double *data) {
 // 	int i;
 
@@ -251,10 +302,22 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		// for (int j = 0; j < freqs_res_values.size(); ++j) {
 		for (int j = 0; j < (sub_buffer_size/2 + 1); ++j) {
 			signal_FFT_MEM[window_mem_current_id][port_i][j] = i_fft[j];
-			freqs_energies[j] += abs(i_fft[j]);
+			// freqs_energies[j] += abs(i_fft[j]);
 		}
 
     }
+
+	// We save the FFT Matrix in memeory
+	// for (int j = 0; j < freqs_res_values.size(); ++j) {
+	for (int j = 0; j < (sub_buffer_size/2 + 1); ++j) {
+		for (int window_iter = 0; window_iter < WINDOW_MEM_LEN; ++window_iter) {	
+			for (port_i = 0; port_i < ports_number; ++port_i) {
+				freqs_energies[j] += abs(signal_FFT_MEM[window_iter][port_i][j]);
+			}
+		}
+	}
+		
+
 
 	// Get relevant freqs
 	std::vector<std::pair<double, int>> freqs_energies_to_sort;
@@ -265,11 +328,17 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	std::sort (freqs_energies_to_sort.begin(), freqs_energies_to_sort.end());
 	std::reverse(freqs_energies_to_sort.begin(),freqs_energies_to_sort.end());
 	freqs_res_values.clear();
-	std::cout << "++\n";
+	std::cout << "++ FREQS\n";
 	std::cout << "[";
 	for (int freq_res_i = 0; freq_res_i < FREQS_RES_LEN; ++freq_res_i) {
 		freqs_res_values.push_back(freqs_energies_to_sort[freq_res_i].second);
 		std::cout << freqs[freqs_energies_to_sort[freq_res_i].second] << ',';
+	}
+	std::cout << "]\n";
+	std::cout << "++ ANGLES\n";
+	std::cout << "[";
+	for (int i = 0; i < (int)angle_values.size(); ++i) {
+		std::cout << angle_values[i] << ", ";
 	}
 	std::cout << "]\n";
 
@@ -336,12 +405,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 		// compute MUSIC spectrum
 		std::vector<double> current_spectrum;
-		std::cout << "[";
-		for (int i = 0; i < (int)angle_values.size(); ++i) {
-		 	std::cout << angle_values[i] << ", ";
-		}
-		std::cout << "]\n";
-		std::cout << "[";
+		
+		//std::cout << "[";
 		std::vector<double> best_aod;
 		double previous_music_value = -1e25;
 		double previous_angle = 0.0;
@@ -367,7 +432,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			}
 			previous_music_value = current_music_value;
 			previous_angle = angle_values[i];
-			std::cout << current_music_value << ", ";
+			//std::cout << current_music_value << ", ";
 			current_spectrum.push_back(current_music_value);
 		}
 		if (best_aod.size() == 0) {
@@ -377,7 +442,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		if (best_aod.size() == 1) {
 			best_aod.push_back(previous_angle);
 		}
-		std::cout << "]\n";
+		// std::cout << "]\n";
 		// printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", best_aod[0]);
 		// printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", best_aod[1]);
 		// printf("FRECUENCIA ACTUAL = %lf\n", freqs[freqs_res_values[freq_i]]);
@@ -398,6 +463,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	std::vector<double> compressed_music;
 	int lim_spectrums = music_spectrum.size();
 	int lim_per_spectrum = music_spectrum[0].size();
+	std::cout << "[";
 	for (int pos_i = 0; pos_i < lim_per_spectrum; ++pos_i) {
 		double current_value_i = 0.0;
 		for (int spectrum_i = 0; spectrum_i < lim_spectrums; ++spectrum_i) {
@@ -405,41 +471,14 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 		compressed_music.push_back(current_value_i / (double)lim_spectrums);
 		// compressed_music.push_back(current_value_i);
-		// std::cout << current_music_value << ", ";
-	}
-
-	std::vector<double> best_aod;
-	std::cout << "[";
-	double previous_music_value = -1e25;
-	double previous_angle = 0.0;
-	int flag = 1;
-	int lim_compressed = compressed_music.size();
-	for (int pos_i = 0; pos_i < lim_compressed; ++pos_i) {
-		double current_music_value = compressed_music[pos_i];
-		std::cout << current_music_value << ", ";
-		if (flag == 1) { // scaling up
-			if (current_music_value < previous_music_value) {
-				best_aod.push_back(previous_angle);
-				flag = 0;
-			}
-		} else { // scaling down
-			if (current_music_value > previous_music_value) {
-				flag = 1;
-			}
-		}
-		previous_music_value = current_music_value;
-		previous_angle = angle_values[pos_i];
-	}
-	if (best_aod.size() == 0) {
-		best_aod.push_back(previous_angle);
-		best_aod.push_back(previous_angle);
-	}
-	if (best_aod.size() == 1) {
-		best_aod.push_back(previous_angle);
+		std::cout << compressed_music[pos_i] << ", ";
 	}
 	std::cout << "]\n";
-	printf("DIRECCION DE ARRIBO MEAN 1 en grados = %lf\n", best_aod[0]);
-	printf("DIRECCION DE ARRIBO MEAN 2 en grados = %lf\n", best_aod[1]);
+	
+	std::vector<double> peaks = get_peaks_in_array(2, compressed_music);
+	
+	printf("DIRECCION DE ARRIBO MEAN 1 en grados = %lf\n", peaks[0]);
+	printf("DIRECCION DE ARRIBO MEAN 2 en grados = %lf\n", peaks[1]);
 
 	window_mem_current_id += 1;
 	if (window_mem_current_id >= WINDOW_MEM_LEN) window_mem_current_id = 0;
