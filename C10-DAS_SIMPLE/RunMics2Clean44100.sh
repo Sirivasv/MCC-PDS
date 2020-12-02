@@ -1,0 +1,1 @@
+./ReadMicWavs das_simple input_ /media/sirivasv/DATAL/MCC/MCCUTILS/corpus44100/clean-2source/ 3
