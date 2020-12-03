@@ -19,11 +19,55 @@
 
 // Include unordered map
 #include<unordered_map>
+// Include deque
+#include <deque>
+
+// Overlapping Split Buffer
+template <class T>
+class OSB {
+		
+		int total_size;
+		std::deque<T> inner_buffer;
+
+  public:
+    
+		OSB() {
+		
+			total_size = 0;
+
+			inner_buffer = std::deque<T>();
+
+		}
+
+		OSB(int total_size_) {
+		
+			total_size = total_size_;
+
+			inner_buffer = std::deque<T>(total_size);
+
+		}
+
+    void insert_element(T new_element_) {
+			inner_buffer.push_back(new_element_);
+			inner_buffer.pop_front();	
+		}
+
+		void legacy_fill(T *data, int fill_size, int start_position) {
+			int lim_iter = start_position + fill_size;
+			for(int b_i = start_position, i = 0; b_i < lim_iter; ++b_i, ++i){
+				data[i] = inner_buffer[b_i];
+			}
+		}
+
+};
 
 std::complex<double> *i_fft, *i_time, *o_fft, *o_time;
 fftw_plan i_forward, o_inverse;
-int ports_number = 3;
+const int ports_number = 3;
 int OUT_SYSTEM_PORTS = 2;
+
+OSB<double> osb_array[ports_number];
+
 jack_port_t **input_port;
 jack_port_t **output_port;
 jack_default_audio_sample_t **in, **out;
@@ -31,12 +75,13 @@ jack_default_audio_sample_t **in, **out;
 jack_client_t *client;
 
 double sample_rate;
-double *buffer, *fft1, *fft2, *hann;
+double *hann;
+double ***filtered_ffts;
 
 unsigned int buffer_size;
 unsigned int fft_size;
 
-unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, out2_offset;
+unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, undelayed_offset;
 
 double *freqs;
 std::complex<double> *delay_vector;
@@ -79,57 +124,40 @@ void filter(double *data) {
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
-	int i;
-	
-	int testing_port_id = 0;
+		
+	int testing_port_id = 2;
 
 	for (int port_i = 0; port_i < ports_number; ++port_i) {
-        in[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[port_i], nframes);
-	    	out[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[port_i], nframes);
-        for (i = 0; i < nframes; ++i) {
-            out[port_i][i] = in[port_i][i];
-        }
-    }
+		in[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[port_i], nframes);
+		out[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[port_i], nframes);
+  }
 	
 	// copy in to las nframes of buffer
-	for (i = 0; i < nframes; ++i, ++in_i) {
-		if (in_i >= buffer_size) in_i = 0;
-		buffer[in_i] = in[testing_port_id][i];
+	for (int i = 0; i < nframes; ++i) {
+		osb_array[testing_port_id].insert_element(in[testing_port_id][i]);
 	}
 
 	// Fill fft1 y fft2
-	unsigned int fft1_i_local = fft1_i; 
-	unsigned int fft2_i_local = fft2_i; 
-	for (i = 0; i < fft_size; ++i, ++fft1_i_local, ++fft2_i_local) {
-		if (fft1_i_local >= buffer_size) fft1_i_local = 0;
-		fft1[i] = buffer[fft1_i_local];
+	osb_array[testing_port_id].legacy_fill(filtered_ffts[testing_port_id][0], fft_size, fft1_i);
+	osb_array[testing_port_id].legacy_fill(filtered_ffts[testing_port_id][1], fft_size, fft2_i);
 
-		if (fft2_i_local >= buffer_size) fft2_i_local = 0;
-		fft2[i] = buffer[fft2_i_local];
+	// Apply Filter to a given angle
+	// Direction angle
+	std::complex<double> direction_angle_coefficient = (-MIC_DIST/SOUND_SPEED)*cos((-90 - (-30.0))*M_PI/180.0);
+	for (int i = 0; i < fft_size; ++i) {
+		std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
+		delay_vector[i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*direction_angle_coefficient);
 	}
 
-	fft1_i += nframes;
-	if (fft1_i >= buffer_size) fft1_i = 0;
+	filter(filtered_ffts[testing_port_id][0]);
+	filter(filtered_ffts[testing_port_id][1]);
 	
-	fft2_i += nframes;
-	if (fft2_i >= buffer_size) fft2_i = 0;
-
-	filter(fft1);
-	filter(fft2);
-	
-	for (i = 0; i < nframes; ++i) {
-		out[0][i] = fft1[fft1_offset + i] + fft2[fft2_offset + i];
+	for (int i = 0; i < nframes; ++i) {
+		out[0][i] = filtered_ffts[testing_port_id][0][fft1_offset + i] + filtered_ffts[testing_port_id][1][fft2_offset + i];
 	}
 
-	// unphased output
-	int out_i = in_i - out2_offset;
-	if (out_i < 0) out_i += buffer_size;
-	for (i = 0; i < nframes; ++i, ++out_i) {
-		if (out_i >= buffer_size) out_i = 0;
-		out[1][i] = buffer[out_i];
-	}
-
-
+	// UNDELAYED output
+	// osb_array[testing_port_id].legacy_fill((double*)out[1], nframes, undelayed_offset);
 	
 	return 0;
 }
@@ -187,14 +215,14 @@ int main (int argc, char *argv[]) {
 	
 	
 	// Preparing overlap and add sizes
+	
 	buffer_size = 6 * nframes;
 	fft_size = 4 * nframes;
-	in_i = 5 * nframes;
 	fft1_i = 0;
 	fft2_i = 2 * nframes;
 	fft1_offset = (int)(2.5 * (double)nframes);
 	fft2_offset = (int)(0.5 * (double)nframes);
-	out2_offset = (int)(3.5 * (double)nframes);
+	undelayed_offset = (int)(2.5 * (double)nframes);
 
 	// printf("%d %d %d\n", fft1_offset, fft2_offset, out2_offset);
 
@@ -208,12 +236,19 @@ int main (int argc, char *argv[]) {
 	i_forward = fftw_plan_dft_1d(fft_size, reinterpret_cast<fftw_complex*>(i_time), reinterpret_cast<fftw_complex*>(i_fft) , FFTW_FORWARD, FFTW_MEASURE);
 	o_inverse = fftw_plan_dft_1d(fft_size, reinterpret_cast<fftw_complex*>(o_fft) , reinterpret_cast<fftw_complex*>(o_time), FFTW_BACKWARD, FFTW_MEASURE);
 	
+	for (i = 0; i < ports_number; ++i) {
+		osb_array[i] = OSB<double>(buffer_size);
+	}
 	
-	buffer = (double *) calloc(buffer_size, sizeof(double));
-	fft1 = (double *) calloc(fft_size, sizeof(double));
-	fft2 = (double *) calloc(fft_size, sizeof(double));
+	filtered_ffts = (double ***) malloc(ports_number * sizeof(double **));
+	for (i = 0; i < ports_number; ++i){
+		filtered_ffts[i] = (double **) malloc(2 * sizeof(double *));
+		filtered_ffts[i][0] = (double *) calloc(fft_size, sizeof(double));
+		filtered_ffts[i][1] = (double *) calloc(fft_size, sizeof(double));
+	}
+	
+
 	hann = (double *) calloc(fft_size, sizeof(double));
-	delay_vector = (std::complex<double> *) malloc(fft_size * sizeof(std::complex<double>));
 	freqs = (double *) calloc(fft_size, sizeof(double));
 
 	// Calculate hann window
@@ -233,12 +268,7 @@ int main (int argc, char *argv[]) {
 	}
 
 	// Exponencials for delay
-	for (i = 0; i < fft_size; ++i) {
-		std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
-		std::complex<double> delay_coefficient = (-MIC_DIST/SOUND_SPEED)*cos((-90 - (-30))*M_PI/180.0);
-		std::cout << delay_coefficient << "  ++++" << std::endl;
-		delay_vector[i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*delay_coefficient);
-	}
+	delay_vector = (std::complex<double> *) malloc(fft_size * sizeof(std::complex<double>));
 
 	input_port = (jack_port_t**) malloc(ports_number * sizeof (jack_port_t*));
   output_port = (jack_port_t**) malloc(ports_number * sizeof (jack_port_t*));
