@@ -76,11 +76,12 @@ jack_client_t *client;
 
 double sample_rate;
 double *hann;
-double ***filtered_ffts;
+double ***input_time_values;
+std::complex<double> ***window_ffts;
 std::complex<double> ***delayed_ffts;
 std::complex<double> **delay_and_sum_fft;
 
-double *doa_value;
+double *doa_angle, *doa_value;
 
 double **delay_and_sum_output_ifft;
 
@@ -90,13 +91,13 @@ unsigned int fft_size;
 unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, undelayed_offset;
 
 double *freqs;
-std::complex<double> *delay_vector;
-double delay_seconds;
-const double MIC_DIST = 0.18;
+std::complex<double> **delay_vector;
+
+const double MIC_DIST = 0.21;
 const double SOUND_SPEED = 343.0;
 const std::complex<double> COMP_I(0.0, 1.0);
 
-void delay_fft(double *data_in, std::complex<double> *data_out) {
+void get_fft(double *data_in, std::complex<double> *data_out) {
 	
 	// Hann
 	for (int i = 0; i < fft_size; ++i) {
@@ -108,7 +109,15 @@ void delay_fft(double *data_in, std::complex<double> *data_out) {
 
 	// Filter
 	for (int i = 0; i < fft_size; ++i) {
-		data_out[i] = i_fft[i] * delay_vector[i];
+		data_out[i] = i_fft[i];
+	}
+
+}
+
+void get_delayed_fft(int current_mic, std::complex<double> *data_in, std::complex<double> *data_out) {
+	
+	for (int i = 0; i < fft_size; ++i) {
+		data_out[i] = data_in[i] * delay_vector[current_mic][i];
 	}
 
 }
@@ -145,55 +154,78 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		out[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[port_i], nframes);
   }
 
-	// Reset to zero
-	for (int i = 0; i < fft_size; ++i) {
-		delay_and_sum_fft[0][i] = 0;
-		delay_and_sum_fft[1][i] = 0;
-	}
+	// Directions
+	doa_angle[0] = 90.0;
+	doa_angle[1] = -30.0;
+	
 
 	for (int current_mic = 0; current_mic < ports_number; current_mic++) {
-
 		// copy in to las nframes of buffer
 		for (int i = 0; i < nframes; ++i) {
 			osb_array[current_mic].insert_element(in[current_mic][i]);
 		}
+	}
 
-		// Fill fft1 y fft2
-		osb_array[current_mic].legacy_fill(filtered_ffts[current_mic][0], fft_size, fft1_i);
-		osb_array[current_mic].legacy_fill(filtered_ffts[current_mic][1], fft_size, fft2_i);
+	for (int curr_angle = 0; curr_angle < 2; ++curr_angle) {
 
-		// Apply Filter to a given angle
-		// Direction angle
-		std::complex<double> direction_angle_coefficient = (-MIC_DIST/SOUND_SPEED)*cos((doa_value[current_mic])*M_PI/180.0);
-		for (int i = 0; i < fft_size; ++i) {
-			std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
-			delay_vector[i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*direction_angle_coefficient);
+		
+		// Direction value
+		doa_value[0] = (-MIC_DIST/SOUND_SPEED)*cos((-90.0 - doa_angle[curr_angle])*M_PI/180.0);
+		doa_value[1] = (-MIC_DIST/SOUND_SPEED)*cos((-150.0 - doa_angle[curr_angle])*M_PI/180.0);
+
+		// Calculate delay vector
+		for (int current_mic = 1; current_mic < ports_number; ++current_mic){
+			
+			for (int i = 0; i < fft_size; ++i) {
+				std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
+				delay_vector[current_mic][i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*doa_value[current_mic - 1]);
+			}
+
 		}
 
-		delay_fft(filtered_ffts[current_mic][0], delayed_ffts[current_mic][0]);
-		delay_fft(filtered_ffts[current_mic][1], delayed_ffts[current_mic][1]);
+		// Reset to zero
+		for (int i = 0; i < fft_size; ++i) {
+			delay_and_sum_fft[0][i] = 0;
+			delay_and_sum_fft[1][i] = 0;
+		}
+
+		for (int current_mic = 0; current_mic < ports_number; current_mic++) {
+
+			// Fill fft1 y fft2
+			osb_array[current_mic].legacy_fill(input_time_values[current_mic][0], fft_size, fft1_i);
+			osb_array[current_mic].legacy_fill(input_time_values[current_mic][1], fft_size, fft2_i);
+
+			// Get FFT and delay input per direction
+			get_fft(input_time_values[current_mic][0], window_ffts[current_mic][0]);
+			get_delayed_fft(current_mic, window_ffts[current_mic][0], delayed_ffts[current_mic][0]);
+			
+			get_fft(input_time_values[current_mic][1], window_ffts[current_mic][1]);
+			get_delayed_fft(current_mic, window_ffts[current_mic][1], delayed_ffts[current_mic][1]);
+			
+			// Sum FFTS
+			for (int i = 0; i < fft_size; ++i) {
+				delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] + delayed_ffts[current_mic][0][i];
+				delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] + delayed_ffts[current_mic][1][i];
+			}
+
+		}
 
 		for (int i = 0; i < fft_size; ++i) {
-			delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] + delayed_ffts[current_mic][0][i];
-			delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] + delayed_ffts[current_mic][1][i];
+				delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] / std::complex<double>(3.0, 3.0);
+				delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] / std::complex<double>(3.0, 3.0);
+		}
+		
+		get_inverse_fft(delay_and_sum_fft[0], delay_and_sum_output_ifft[0]);
+		get_inverse_fft(delay_and_sum_fft[1], delay_and_sum_output_ifft[1]);
+		
+		for (int i = 0; i < nframes; ++i) {
+			//delay_and_sum_output_ifft
+			out[curr_angle][i] = delay_and_sum_output_ifft[0][fft1_offset + i] + delay_and_sum_output_ifft[1][fft2_offset + i];
 		}
 
 	}
-	for (int i = 0; i < fft_size; ++i) {
-			delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] / std::complex<double>(3.0, 3.0);
-			delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] / std::complex<double>(3.0, 3.0);
-	}
-	
-	get_inverse_fft(delay_and_sum_fft[0], delay_and_sum_output_ifft[0]);
-	get_inverse_fft(delay_and_sum_fft[1], delay_and_sum_output_ifft[1]);
-	
-	for (int i = 0; i < nframes; ++i) {
-		//delay_and_sum_output_ifft
-		out[0][i] = delay_and_sum_output_ifft[0][fft1_offset + i] + delay_and_sum_output_ifft[1][fft2_offset + i];
-	}
-
 	// for (int i = 0; i < nframes; ++i) {
-	// 	out[0][i] = filtered_ffts[current_mic][0][fft1_offset + i] + filtered_ffts[current_mic][1][fft2_offset + i];
+	// 	out[0][i] = input_time_values[current_mic][0][fft1_offset + i] + input_time_values[current_mic][1][fft2_offset + i];
 	// }
 
 	// UNDELAYED output
@@ -218,9 +250,7 @@ int main (int argc, char *argv[]) {
 	jack_status_t status;
 	int i;
 
-	delay_seconds = 0.020;
-	
-	/* open a client connection to the JACK server */
+		/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status);
 	if (client == NULL){
 		/* if connection failed, say why */
@@ -280,11 +310,18 @@ int main (int argc, char *argv[]) {
 		osb_array[i] = OSB<double>(buffer_size);
 	}
 	
-	filtered_ffts = (double ***) malloc(ports_number * sizeof(double **));
+	input_time_values = (double ***) malloc(ports_number * sizeof(double **));
 	for (i = 0; i < ports_number; ++i){
-		filtered_ffts[i] = (double **) malloc(2 * sizeof(double *));
-		filtered_ffts[i][0] = (double *) calloc(fft_size, sizeof(double));
-		filtered_ffts[i][1] = (double *) calloc(fft_size, sizeof(double));
+		input_time_values[i] = (double **) malloc(2 * sizeof(double *));
+		input_time_values[i][0] = (double *) calloc(fft_size, sizeof(double));
+		input_time_values[i][1] = (double *) calloc(fft_size, sizeof(double));
+	}
+
+	window_ffts = (std::complex<double> ***) fftw_malloc(ports_number * sizeof(std::complex<double> **));
+	for (i = 0; i < ports_number; ++i){
+		window_ffts[i] = (std::complex<double> **) fftw_malloc(2 * sizeof(std::complex<double> *));
+		window_ffts[i][0] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
+		window_ffts[i][1] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
 	}
 
 	delayed_ffts = (std::complex<double> ***) fftw_malloc(ports_number * sizeof(std::complex<double> **));
@@ -293,6 +330,7 @@ int main (int argc, char *argv[]) {
 		delayed_ffts[i][0] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
 		delayed_ffts[i][1] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
 	}
+
 	delay_and_sum_fft = (std::complex<double> **) fftw_malloc(sizeof(std::complex<double>*) * 2);
 	delay_and_sum_fft[0] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * fft_size);
 	delay_and_sum_fft[1] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * fft_size);
@@ -301,12 +339,9 @@ int main (int argc, char *argv[]) {
 	delay_and_sum_output_ifft[0] = (double *) malloc(fft_size * sizeof(double));
 	delay_and_sum_output_ifft[1] = (double *) malloc(fft_size * sizeof(double));
 	
+	doa_angle = (double *) malloc(2 * sizeof(double));
 	doa_value = (double *) malloc(ports_number * sizeof(double));
-	doa_value[0] = 180.0;
-	doa_value[1] = -90.0 - (-30.0);
-	doa_value[2] = -150.0 - (-30.0);
 	
-
 	hann = (double *) calloc(fft_size, sizeof(double));
 	freqs = (double *) calloc(fft_size, sizeof(double));
 
@@ -327,7 +362,14 @@ int main (int argc, char *argv[]) {
 	}
 
 	// Exponencials for delay
-	delay_vector = (std::complex<double> *) malloc(fft_size * sizeof(std::complex<double>));
+	delay_vector = (std::complex<double> **) malloc(ports_number * sizeof(std::complex<double>));
+	for (i = 0; i < ports_number; ++i) {
+		delay_vector[i] = (std::complex<double> *) malloc(fft_size * sizeof(std::complex<double>));
+	}
+	for (i = 0; i < fft_size;++i) {
+		delay_vector[0][i] = std::complex<double>(1.0, 0.0);
+	}
+	
 
 	input_port = (jack_port_t**) malloc(ports_number * sizeof (jack_port_t*));
   output_port = (jack_port_t**) malloc(ports_number * sizeof (jack_port_t*));
