@@ -77,6 +77,12 @@ jack_client_t *client;
 double sample_rate;
 double *hann;
 double ***filtered_ffts;
+std::complex<double> ***delayed_ffts;
+std::complex<double> **delay_and_sum_fft;
+
+double *doa_value;
+
+double **delay_and_sum_output_ifft;
 
 unsigned int buffer_size;
 unsigned int fft_size;
@@ -90,29 +96,37 @@ const double MIC_DIST = 0.18;
 const double SOUND_SPEED = 343.0;
 const std::complex<double> COMP_I(0.0, 1.0);
 
-void filter(double *data) {
-	int i;
-
+void delay_fft(double *data_in, std::complex<double> *data_out) {
+	
 	// Hann
-	for (i = 0; i < fft_size; ++i) {
-		i_time[i] = data[i] * hann[i];
+	for (int i = 0; i < fft_size; ++i) {
+		i_time[i] = data_in[i] * hann[i];
 	}
 
 	// FFT
 	fftw_execute(i_forward);
 
 	// Filter
-	for (i = 0; i < fft_size; ++i) {
-		o_fft[i] = i_fft[i] * delay_vector[i];
+	for (int i = 0; i < fft_size; ++i) {
+		data_out[i] = i_fft[i] * delay_vector[i];
+	}
+
+}
+
+void get_inverse_fft(std::complex<double> *data_in, double *data_out) {
+	
+	for (int i = 0; i < fft_size; ++i) {
+	 o_fft[i] = data_in[i];
 	}
 
 	// ifft
 	fftw_execute(o_inverse);
 
 	// return
-	for(i = 0; i < fft_size; i++){
-		data[i] = std::real(o_time[i])/(double)fft_size; //fftw3 requiere normalizar su salida real de esta manera
+	for(int i = 0; i < fft_size; i++){
+		data_out[i] = std::real(o_time[i])/(double)fft_size; //fftw3 requiere normalizar su salida real de esta manera
 	}
+
 }
 
 /**
@@ -125,36 +139,62 @@ void filter(double *data) {
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
 		
-	int testing_port_id = 2;
-
+	
 	for (int port_i = 0; port_i < ports_number; ++port_i) {
 		in[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[port_i], nframes);
 		out[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_port[port_i], nframes);
   }
-	
-	// copy in to las nframes of buffer
-	for (int i = 0; i < nframes; ++i) {
-		osb_array[testing_port_id].insert_element(in[testing_port_id][i]);
-	}
 
-	// Fill fft1 y fft2
-	osb_array[testing_port_id].legacy_fill(filtered_ffts[testing_port_id][0], fft_size, fft1_i);
-	osb_array[testing_port_id].legacy_fill(filtered_ffts[testing_port_id][1], fft_size, fft2_i);
-
-	// Apply Filter to a given angle
-	// Direction angle
-	std::complex<double> direction_angle_coefficient = (-MIC_DIST/SOUND_SPEED)*cos((-90 - (-30.0))*M_PI/180.0);
+	// Reset to zero
 	for (int i = 0; i < fft_size; ++i) {
-		std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
-		delay_vector[i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*direction_angle_coefficient);
+		delay_and_sum_fft[0][i] = 0;
+		delay_and_sum_fft[1][i] = 0;
 	}
 
-	filter(filtered_ffts[testing_port_id][0]);
-	filter(filtered_ffts[testing_port_id][1]);
+	for (int current_mic = 0; current_mic < ports_number; current_mic++) {
+
+		// copy in to las nframes of buffer
+		for (int i = 0; i < nframes; ++i) {
+			osb_array[current_mic].insert_element(in[current_mic][i]);
+		}
+
+		// Fill fft1 y fft2
+		osb_array[current_mic].legacy_fill(filtered_ffts[current_mic][0], fft_size, fft1_i);
+		osb_array[current_mic].legacy_fill(filtered_ffts[current_mic][1], fft_size, fft2_i);
+
+		// Apply Filter to a given angle
+		// Direction angle
+		std::complex<double> direction_angle_coefficient = (-MIC_DIST/SOUND_SPEED)*cos((doa_value[current_mic])*M_PI/180.0);
+		for (int i = 0; i < fft_size; ++i) {
+			std::complex<double> freq_res_complex = std::complex<double>(freqs[i],0.0);
+			delay_vector[i] = std::exp(-COMP_I*2.0*M_PI*freq_res_complex*direction_angle_coefficient);
+		}
+
+		delay_fft(filtered_ffts[current_mic][0], delayed_ffts[current_mic][0]);
+		delay_fft(filtered_ffts[current_mic][1], delayed_ffts[current_mic][1]);
+
+		for (int i = 0; i < fft_size; ++i) {
+			delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] + delayed_ffts[current_mic][0][i];
+			delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] + delayed_ffts[current_mic][1][i];
+		}
+
+	}
+	for (int i = 0; i < fft_size; ++i) {
+			delay_and_sum_fft[0][i] = delay_and_sum_fft[0][i] / std::complex<double>(3.0, 3.0);
+			delay_and_sum_fft[1][i] = delay_and_sum_fft[1][i] / std::complex<double>(3.0, 3.0);
+	}
+	
+	get_inverse_fft(delay_and_sum_fft[0], delay_and_sum_output_ifft[0]);
+	get_inverse_fft(delay_and_sum_fft[1], delay_and_sum_output_ifft[1]);
 	
 	for (int i = 0; i < nframes; ++i) {
-		out[0][i] = filtered_ffts[testing_port_id][0][fft1_offset + i] + filtered_ffts[testing_port_id][1][fft2_offset + i];
+		//delay_and_sum_output_ifft
+		out[0][i] = delay_and_sum_output_ifft[0][fft1_offset + i] + delay_and_sum_output_ifft[1][fft2_offset + i];
 	}
+
+	// for (int i = 0; i < nframes; ++i) {
+	// 	out[0][i] = filtered_ffts[current_mic][0][fft1_offset + i] + filtered_ffts[current_mic][1][fft2_offset + i];
+	// }
 
 	// UNDELAYED output
 	// osb_array[testing_port_id].legacy_fill((double*)out[1], nframes, undelayed_offset);
@@ -246,6 +286,25 @@ int main (int argc, char *argv[]) {
 		filtered_ffts[i][0] = (double *) calloc(fft_size, sizeof(double));
 		filtered_ffts[i][1] = (double *) calloc(fft_size, sizeof(double));
 	}
+
+	delayed_ffts = (std::complex<double> ***) fftw_malloc(ports_number * sizeof(std::complex<double> **));
+	for (i = 0; i < ports_number; ++i){
+		delayed_ffts[i] = (std::complex<double> **) fftw_malloc(2 * sizeof(std::complex<double> *));
+		delayed_ffts[i][0] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
+		delayed_ffts[i][1] = (std::complex<double> *) fftw_malloc(fft_size * sizeof(std::complex<double>));
+	}
+	delay_and_sum_fft = (std::complex<double> **) fftw_malloc(sizeof(std::complex<double>*) * 2);
+	delay_and_sum_fft[0] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * fft_size);
+	delay_and_sum_fft[1] = (std::complex<double> *) fftw_malloc(sizeof(std::complex<double>) * fft_size);
+	
+	delay_and_sum_output_ifft = (double **) malloc(2 * sizeof(double*));
+	delay_and_sum_output_ifft[0] = (double *) malloc(fft_size * sizeof(double));
+	delay_and_sum_output_ifft[1] = (double *) malloc(fft_size * sizeof(double));
+	
+	doa_value = (double *) malloc(ports_number * sizeof(double));
+	doa_value[0] = 180.0;
+	doa_value[1] = -90.0 - (-30.0);
+	doa_value[2] = -150.0 - (-30.0);
 	
 
 	hann = (double *) calloc(fft_size, sizeof(double));
