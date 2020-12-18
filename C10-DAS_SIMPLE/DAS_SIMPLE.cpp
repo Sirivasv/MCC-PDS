@@ -22,6 +22,15 @@
 // Include deque
 #include <deque>
 
+// To read/write files
+#include <sndfile.h>
+
+// Write file required data
+//sndfile stuff
+SNDFILE ** audio_file;
+SF_INFO *audio_info;
+unsigned int * audio_position;
+
 // Overlapping Split Buffer
 template <class T>
 class OSB {
@@ -93,7 +102,7 @@ unsigned int in_i, fft1_i, fft2_i, fft1_offset, fft2_offset, undelayed_offset;
 double *freqs;
 std::complex<double> **delay_vector;
 
-const double MIC_DIST = 0.21;
+const double MIC_DIST = 0.18;
 const double SOUND_SPEED = 343.0;
 const std::complex<double> COMP_I(0.0, 1.0);
 
@@ -147,7 +156,15 @@ void get_inverse_fft(std::complex<double> *data_in, double *data_out) {
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
-		
+	
+	// Write file buffer
+	float **write_buffer_doa;
+	int *write_count_doa;
+	write_count_doa = (int*)malloc(2 * sizeof(int));
+	write_buffer_doa = (float**)malloc(2 * sizeof(float*));
+	write_buffer_doa[0] = (float *)malloc(nframes*sizeof(float));
+	write_buffer_doa[1] = (float *)malloc(nframes*sizeof(float));
+
 	
 	for (int port_i = 0; port_i < ports_number; ++port_i) {
 		in[port_i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_port[port_i], nframes);
@@ -221,7 +238,24 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		for (int i = 0; i < nframes; ++i) {
 			//delay_and_sum_output_ifft
 			out[curr_angle][i] = delay_and_sum_output_ifft[0][fft1_offset + i] + delay_and_sum_output_ifft[1][fft2_offset + i];
+			write_buffer_doa[curr_angle][i] = out[curr_angle][i];
 		}
+
+		// Write to file
+		write_count_doa[curr_angle] = sf_write_float(audio_file[curr_angle], write_buffer_doa[curr_angle], nframes);
+
+		//Print Audio position
+		audio_position[curr_angle] += write_count_doa[curr_angle];
+		printf("\rAudio file in position: %d (%0.2f secs)", audio_position[curr_angle], (double)audio_position[curr_angle]/sample_rate);
+		
+		//Check for writing error
+		if(write_count_doa[curr_angle] != nframes){
+			printf("\nEncountered I/O error in file %d. Exiting.\n", curr_angle);
+			sf_close(audio_file[curr_angle]);
+			jack_client_close (client);
+			exit (1);
+		}
+
 
 	}
 	// for (int i = 0; i < nframes; ++i) {
@@ -395,6 +429,37 @@ int main (int argc, char *argv[]) {
 	// 	exit (1);
 	// }
 	
+	// Info for files
+	char audio_file_path[100];
+
+	audio_info = (SF_INFO*)malloc(2 * sizeof(SF_INFO));
+	audio_position = (unsigned int*)malloc(2 * sizeof(unsigned int));
+	audio_position[0] = 0;
+	audio_position[1] = 0;
+	audio_file = (SNDFILE**)malloc(2 * sizeof(SNDFILE*));
+
+	for (int num_in_mics = 0; num_in_mics < 2; ++num_in_mics) {
+
+		sprintf(audio_file_path, "./out_file_doa_%d.wav", num_in_mics+1);
+		printf("Trying to open audio File: %s\n", audio_file_path);
+		audio_info[num_in_mics].samplerate = sample_rate;
+		audio_info[num_in_mics].channels = 1;
+		audio_info[num_in_mics].format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+		
+		audio_file[num_in_mics] = sf_open (audio_file_path,SFM_WRITE,&audio_info[num_in_mics]);
+		if(audio_file[num_in_mics] == NULL){
+			printf("%s\n",sf_strerror(NULL));
+			exit(1);
+		}else{
+			printf("Audio file info:\n");
+			printf("\tSample Rate: %d\n",audio_info[num_in_mics].samplerate);
+			printf("\tChannels: %d\n",audio_info[num_in_mics].channels);
+		}
+
+	}
+	
+
+
 	/* Tell the JACK server that we are ready to roll.
 	   Our jack_callback() callback will start running now. */
 	if (jack_activate (client)) {

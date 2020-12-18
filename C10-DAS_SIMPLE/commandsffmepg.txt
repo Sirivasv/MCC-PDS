@@ -1,0 +1,14 @@
+# To cut the end of a file
+ffmpeg -i pristine_channel1.wav -to 00:00:15.89 -c copy snap_pristine_channel_1.wav
+
+# To cut the start of a file
+ffmpeg -i out_file_doa_1.wav -ss 00:00:05.58 -c copy snap_out_file_doa_1.wav
+
+# Current STEPS
+# 1. We prepare the chronometer
+# 2. We start the chronometer just when we start the main executable of DAS
+# 3. Then we stop the chronometer just when we start RunMics executable
+# 4. We stop the main executable before the end of the RunMics audio
+# 5. We cut the first seconds of the generated files, the seconds marked in the chronometer
+# 6. We cut the last seconds of the pristine recordings, the seconds of the total generated files
+# 7. Then we end up with 2 files with the separated sources and 2 files with the pristine recordings synced up
