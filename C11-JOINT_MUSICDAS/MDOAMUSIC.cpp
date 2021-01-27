@@ -580,11 +580,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	
 	/* DAS */
 	
-	// doa_angle[0] = mint_val / mt_cnt;
-	// doa_angle[1] = mat_val / mt_cnt;
+	doa_angle[0] = mint_val / mt_cnt;
+	doa_angle[1] = mat_val / mt_cnt;
 	
-	doa_angle[0] = 90.0;
-	doa_angle[1] = -30.0;
+	// doa_angle[0] = 90.0;
+	// doa_angle[1] = -30.0;
 
 	// Write file buffer
 	float **write_buffer_doa;
