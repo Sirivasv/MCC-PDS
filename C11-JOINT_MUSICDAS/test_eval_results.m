@@ -1,7 +1,8 @@
 [ydoa1, fs] = audioread("snap_out_file_doa_1.wav")
 [ydoa2, fs] = audioread("snap_out_file_doa_2.wav")
-[ypris1, fs] = audioread("snap_pristine_clean_channel_1.wav")
-[ypris2, fs] = audioread("snap_pristine_clean_channel_2.wav")
+[ypris1, fs] = audioread("snap_pristine_channel_1.wav")
+[ypris2, fs] = audioread("snap_pristine_channel_2.wav")
+
 %[ydoa1, fs] = audioread("snap_pristine_clean_channel_1.wav")
 %[ydoa2, fs] = audioread("snap_pristine_clean_channel_2.wav")
 
@@ -25,4 +26,4 @@ ypris1 = reshape(ypris1, 1,N)
 ypris2 = ypris2(1:N)
 ypris2 = reshape(ypris2, 1,N)
 
-[SDR,SIR,SAR,perm]=bss_eval_sources([ydoa1;ydoa2],[ypris1;ypris2])
+[SDR,SIR,SAR,perm]=bss_eval_sources([ydoa2;ydoa1],[ypris1;ypris2])
