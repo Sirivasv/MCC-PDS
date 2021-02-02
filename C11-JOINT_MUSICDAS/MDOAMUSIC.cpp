@@ -550,7 +550,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 		mt_cnt += 1.0;
 	}
-
+	printf("----------------\n");
 	printf("DIRECCION DE ARRIBO 1 en grados = %lf\n", mint_val / mt_cnt);
 	printf("DIRECCION DE ARRIBO 2 en grados = %lf\n", mat_val / mt_cnt);
 	window_mem_current_id += 1;
